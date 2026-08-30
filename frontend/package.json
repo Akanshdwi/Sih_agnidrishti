@@ -1,0 +1,19 @@
+{
+    "name": "firewatch-frontend",
+    "type": "module",
+    "version": "1.0.0",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build"
+    },
+    "dependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "leaflet": "^1.9.4",
+        "react-leaflet": "^5.0.0"
+    },
+    "devDependencies": {
+        "vite": "^6.0.0",
+        "@vitejs/plugin-react": "^4.3.4"
+    }
+}
