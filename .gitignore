@@ -1,0 +1,18 @@
+# Large OSM datasets
+data/raw/osm/*.osm.pbf
+
+# Large raster datasets
+data/raw/**/*.tif
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+data/raw/osm/*.osm.pbf
+data/raw/**/*.tif
