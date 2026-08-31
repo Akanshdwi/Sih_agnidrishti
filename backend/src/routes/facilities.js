@@ -10,9 +10,37 @@ router.get('/', async (req, res) => {
     res.json(rows);
 });
 
-// POST /api/facilities/bulk -- feed OSM Overpass results here
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+
+    const facility = await pool.query(
+        `SELECT id, name, type, osm_id, ST_AsGeoJSON(geom) AS geometry FROM facilities WHERE id=$1`,
+        [id]
+    );
+    if (!facility.rows.length) return res.status(404).json({ error: 'Not found' });
+
+    const history = await pool.query(
+        `SELECT id, acq_date, frp, brightness_ti4, classification, risk_score
+     FROM hotspots WHERE facility_id=$1 ORDER BY acq_date ASC`,
+        [id]
+    );
+
+    const stats = await pool.query(
+        `SELECT AVG(frp) AS avg_frp, STDDEV(frp) AS std_frp, COUNT(*) AS detection_count,
+            MAX(acq_date) AS last_seen
+     FROM hotspots WHERE facility_id=$1`,
+        [id]
+    );
+
+    res.json({
+        ...facility.rows[0],
+        history: history.rows,
+        stats: stats.rows[0],
+    });
+});
+
 router.post('/bulk', async (req, res) => {
-    const facilities = req.body; // [{name, type, osm_id, geojsonPolygon}]
+    const facilities = req.body;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');

@@ -3,7 +3,6 @@ import { pool } from '../db.js';
 
 const router = Router();
 
-// GET /api/hotspots?since=2026-08-01&class=Industrial+Fire
 router.get('/', async (req, res) => {
   const { since, class: cls } = req.query;
   const conditions = [];
@@ -20,12 +19,15 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-// POST /api/hotspots  -- raw ingestion (from FIRMS pull script or ML pipeline)
 router.post('/', async (req, res) => {
   const {
     lat, lon, satellite, acq_date, brightness_ti4, frp, confidence,
     classification, class_confidence, risk_score, facility_id, explanation, raw
   } = req.body;
+
+  if (typeof lat !== 'number' || typeof lon !== 'number') {
+    return res.status(400).json({ error: 'lat/lon required as numbers' });
+  }
 
   const { rows } = await pool.query(
     `INSERT INTO hotspots
@@ -39,7 +41,6 @@ router.post('/', async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 });
 
-// PATCH /api/hotspots/:id  -- ML team updates classification after model runs
 router.patch('/:id', async (req, res) => {
   const { classification, class_confidence, risk_score, explanation } = req.body;
   await pool.query(
