@@ -4,6 +4,7 @@ import { getHotspots, getFacilities } from './api.js';
 import FacilityPanel from './FacilityPanel.jsx';
 import TimeSlider from './TimeSlider.jsx';
 import Legend from './Legend.jsx';
+import Scene3D from './Scene3D.jsx';
 
 const COLORS = {
     'Gas Flare': '#f59e0b',
@@ -20,6 +21,7 @@ export default function MapView() {
     const [facilities, setFacilities] = useState([]);
     const [selectedFacility, setSelectedFacility] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [show3D, setShow3D] = useState(false);
 
     useEffect(() => {
         Promise.all([getHotspots(), getFacilities()]).then(([h, f]) => {
@@ -84,6 +86,19 @@ export default function MapView() {
             <Legend />
             <FacilityPanel facilityId={selectedFacility} onClose={() => setSelectedFacility(null)} />
             <TimeSlider hotspots={hotspots} onFilteredChange={handleFilteredChange} />
+
+            <button onClick={() => setShow3D(true)} style={{
+                position: 'absolute', top: 70, left: 10, zIndex: 1000,
+                padding: '8px 14px', borderRadius: 8, border: 'none',
+                background: '#1e293b', color: 'white', fontWeight: 600, cursor: 'pointer',
+                fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}>
+                🔥 3D Terrain View
+            </button>
+
+            {show3D && (
+                <Scene3D hotspots={hotspots} facilities={facilities} onClose={() => setShow3D(false)} />
+            )}
         </>
     );
 }
