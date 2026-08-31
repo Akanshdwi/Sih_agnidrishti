@@ -79,10 +79,9 @@ class LandCoverExtractor:
 
         dataset = self._open_tile(raster_path)
 
-        
+        row, col = dataset.index(longitude, latitude)
 
-        value = next(
-        dataset.sample([(longitude, latitude)]))[0]
+        value = dataset.read(1)[row, col]
 
         class_code = int(value)
 
