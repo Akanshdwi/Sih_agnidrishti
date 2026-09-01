@@ -10,9 +10,10 @@ __pycache__/
 
 # Environment
 .env
+backend/venv/
 
 # Jupyter
 .ipynb_checkpoints/
 
-data/raw/osm/*.osm.pbf
-data/raw/**/*.tif
+# Node
+node_modules/
