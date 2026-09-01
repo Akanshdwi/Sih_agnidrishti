@@ -16,3 +16,4 @@ __pycache__/
 
 data/raw/osm/*.osm.pbf
 data/raw/**/*.tif
+data/processed/
