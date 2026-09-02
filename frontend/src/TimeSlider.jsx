@@ -20,21 +20,18 @@ export default function TimeSlider({ hotspots, onFilteredChange }) {
     const cutoffDate = new Date(minDate + ((maxDate - minDate) * dayOffset) / 30);
 
     return (
-        <div className="card" style={{
-            position: 'absolute', bottom: 10, right: 10, left: 370,
-            padding: '12px 20px', zIndex: 1000,
-        }}>
-            <div style={{ fontSize: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                <span>{new Date(minDate).toLocaleDateString()}</span>
-                <b style={{ color: '#1e293b' }}>{cutoffDate.toLocaleString()}</b>
-                <span>{new Date(maxDate).toLocaleDateString()}</span>
-            </div>
+        <div className="timeslider-bar">
+            <div className="slider-label">Timeline </div>
+            <span className="slider-date">{new Date(minDate).toLocaleDateString([], {month:'short', day:'numeric'})}</span>
             <input
                 type="range" className="slider-track"
                 min={0} max={30} step={0.1}
                 value={dayOffset}
                 onChange={e => setDayOffset(Number(e.target.value))}
             />
+            <span className="slider-date" style={{ color: 'var(--text-primary)' }}>
+                {cutoffDate.toLocaleDateString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+            </span>
         </div>
     );
 }
