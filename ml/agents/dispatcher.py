@@ -62,10 +62,12 @@ def compute_risk(hotspot: dict) -> float:
 
     raw      = hotspot.get("raw") or {}
     zscore   = float(raw.get("frp_zscore") or hotspot.get("frp_zscore") or 0.0)
-    dist_km  = float(raw.get("dist_to_cluster_km") or hotspot.get("dist_to_cluster_km") or 40.0)
+    # Default dist = 20 km (realistic for Gujarat industrial belt); was 40 km
+    dist_km  = float(raw.get("dist_to_cluster_km") or hotspot.get("dist_to_cluster_km") or 20.0)
 
-    # Boost z-score using absolute FRP (large FRP always dangerous)
-    frp_boost = math.log1p(frp) / math.log1p(500)   # 0–1 logarithmic
+    # FRP boost: reference point = 50 MW (regional average for large industrial fire)
+    # log(50)/log(51) ≈ 0.97 so even moderate FRP (10–30 MW) gets 0.6–0.8
+    frp_boost = math.log1p(frp) / math.log1p(50)
     effective_z = max(zscore, frp_boost * 10)
 
     w_class = CLASS_WEIGHTS.get(cls, 0.20)
@@ -73,9 +75,10 @@ def compute_risk(hotspot: dict) -> float:
     w_conf  = cls_conf
     w_pop   = _population_proxy(dist_km)
 
+    # Weights: class 45% | FRP/anomaly 25% | confidence 20% | proximity 10%
     raw_score = (w_class * 0.45
-                 + w_z    * 0.30
-                 + w_conf * 0.15
+                 + w_z    * 0.25
+                 + w_conf * 0.20
                  + w_pop  * 0.10)
 
     return round(min(100.0, max(0.0, raw_score * 100)), 1)
