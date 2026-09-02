@@ -186,10 +186,17 @@ export default function Scene3D({ hotspots, facilities, onClose }) {
                     style={{ height: '100%', width: '100%', background: '#0f172a' }}
                     zoomControl={true}
                 >
-                    {/* Dark satellite base */}
+                    {/* Esri Dark Gray Canvas — free, no API key required */}
                     <TileLayer
-                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                        attribution="© OpenStreetMap © CARTO"
+                        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                        attribution="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+                        maxZoom={16}
+                    />
+                    {/* Reference layer — adds city/road/border labels */}
+                    <TileLayer
+                        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+                        maxZoom={16}
+                        pane="shadowPane"
                     />
 
                     {/* Auto-fit to detections */}
