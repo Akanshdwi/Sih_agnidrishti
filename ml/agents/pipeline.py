@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 import urllib.request
 from pathlib import Path
@@ -27,12 +28,13 @@ from pathlib import Path
 import pandas as pd
 
 from ml.agents import detector, skeptic, dispatcher
-from ml.feature_engineering import load_all_clusters, FEATURE_COLS
+from ml.feature_engineering import load_all_clusters, load_and_engineer, FEATURE_COLS
 from ml.labeler import label_dataframe
 from ml.predict import load_models, predict_dataframe
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
-API_BASE   = "http://localhost:4000/api"
+API_BASE   = os.environ.get("API_BASE", "http://localhost:4000/api")
+DB_URL     = os.environ.get("DATABASE_URL", "postgresql://sih:sih@localhost:5432/firewatch")
 
 
 # ── API helpers ───────────────────────────────────────────────────────────────
@@ -176,6 +178,9 @@ def run_pipeline(
         "skipped":        len(skipped1),
         "debunked":       len(debunked2),
         "validated":      len(dispatched),
+        # 'patched' mirrors patch_ok — ml.js regex fallback looks for 'Patched: N'
+        "patched":        patch_ok,
+        "incidents":      incident_ok,
         "priority_counts":priority_counts,
         "patch_ok":       patch_ok,
         "incident_ok":    incident_ok,
@@ -191,6 +196,40 @@ def run_pipeline(
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+def _load_from_db() -> pd.DataFrame:
+    """
+    Pull unclassified hotspots from the live DB for write-back mode.
+    Falls back to labeled.parquet if psycopg2 unavailable.
+    """
+    try:
+        import psycopg2
+        print(f"  Connecting to DB: {DB_URL[:40]}…")
+        conn = psycopg2.connect(DB_URL)
+        raw = pd.read_sql(
+            """SELECT id, lat AS latitude, lon AS longitude,
+                      brightness_ti4 AS bright_ti4,
+                      frp, confidence, satellite, acq_date,
+                      facility_id, raw
+               FROM hotspots
+               WHERE classification IS NULL
+               ORDER BY created_at DESC
+               LIMIT 10000""",
+            conn,
+        )
+        conn.close()
+        print(f"  Loaded {len(raw):,} unclassified hotspots from DB.")
+        if raw.empty:
+            print("  WARN: No unclassified hotspots in DB — nothing to do.")
+            return pd.DataFrame()
+        return load_and_engineer(df_raw=raw)
+    except ImportError:
+        print("  WARN: psycopg2 not available — falling back to labeled.parquet")
+        return pd.DataFrame()  # caller will fallback
+    except Exception as e:
+        print(f"  WARN: DB connection failed ({e}) — falling back to labeled.parquet")
+        return pd.DataFrame()
+
+
 def main():
     parser = argparse.ArgumentParser(description="AgniDrishti Multi-Agent Pipeline")
     parser.add_argument("--write-back", action="store_true",
@@ -203,26 +242,46 @@ def main():
     print("  AgniDrishti — Multi-Agent Pipeline")
     print("=" * 60)
 
-    # Load or engineer features
-    lp = Path(args.input) if args.input else OUTPUT_DIR / "labeled.parquet"
-    if lp.exists():
-        print(f"\n[1/2] Loading features from {lp.name} …")
-        df = pd.read_parquet(lp)
-        if "id" not in df.columns:
+    df = pd.DataFrame()
+
+    # In write-back mode: prefer live DB hotspots
+    if args.write_back:
+        print("\n[1/2] Loading live DB hotspots (write-back mode) …")
+        df = _load_from_db()
+
+    # Fallback: labeled.parquet or FIRMS CSVs
+    if df.empty:
+        lp = Path(args.input) if args.input else OUTPUT_DIR / "labeled.parquet"
+        if lp.exists():
+            print(f"\n[1/2] Loading features from {lp.name} …")
+            df = pd.read_parquet(lp)
+            if "id" not in df.columns:
+                df["id"] = range(1, len(df) + 1)
+        else:
+            print("\n[1/2] No parquet found — loading from FIRMS CSVs …")
+            df = load_all_clusters()
+            df = label_dataframe(df)
             df["id"] = range(1, len(df) + 1)
-    else:
-        print("\n[1/2] No parquet found — loading from FIRMS CSVs …")
-        df = load_all_clusters()
-        df = label_dataframe(df)
-        df["id"] = range(1, len(df) + 1)
+
+    if df.empty:
+        summary = {"total": 0, "skipped": 0, "debunked": 0, "validated": 0,
+                   "patched": 0, "incidents": 0, "priority_counts": {}}
+        print(json.dumps(summary))
+        return
 
     # Run ML predictions if not already present
     if "predicted_name" not in df.columns:
         print("[1b/2] Running ML inference …")
-        xgb_model, lgb_model, _ = load_models()
-        df = predict_dataframe(df, xgb_model, lgb_model)
+        try:
+            xgb_model, lgb_model, _ = load_models()
+            df = predict_dataframe(df, xgb_model, lgb_model)
+        except FileNotFoundError:
+            print("  WARN: No trained models found — using labeler for classification.")
+            df = label_dataframe(df)
+            df["predicted_name"]   = df["label_name"]
+            df["class_confidence"] = df["label_conf"]
+            df["risk_score"]       = 0.0
     else:
-        # Map existing label_name → predicted_name for compatibility
         if "label_name" in df.columns and "predicted_name" not in df.columns:
             df["predicted_name"]   = df["label_name"]
             df["class_confidence"] = df.get("label_conf", 0.7)
@@ -236,11 +295,13 @@ def main():
     print(f"  Skipped:   {summary['skipped']:,}  (Agent 1 — below threshold)")
     print(f"  Debunked:  {summary['debunked']:,}  (Agent 2 — false positive)")
     print(f"  Validated: {summary['validated']:,}  (Agent 3 — real events)")
+    print(f"  Patched:   {summary['patched']} hotspots")
+    print(f"  Incidents: {summary['incidents']} created")
     print(f"  Priority:  {summary['priority_counts']}")
-    if args.write_back:
-        print(f"  Patched:   {summary['patch_ok']} hotspots")
-        print(f"  Incidents: {summary['incident_ok']} created")
-    print("=" * 60 + "\n")
+    print("=" * 60)
+
+    # ── Emit JSON summary as last line so ml.js JSON-first parser captures it ──
+    print(json.dumps(summary))
 
 
 if __name__ == "__main__":
