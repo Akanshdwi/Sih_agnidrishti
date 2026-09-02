@@ -1,6 +1,7 @@
 /* ─── AgniDrishti Design System — Fire Amber Theme ────────────────────────── */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@500;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -432,4 +433,15 @@ body {
     box-shadow: 0 8px 40px rgba(0,0,0,0.5);
     z-index: 1400;
     overflow: hidden;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
 }
