@@ -83,5 +83,12 @@ class OSMSpatialQuery:
                 float(nearest["distance_m"]),
                 2
             )
+           
 
         return result
+    def close(self):
+        
+        """
+        Release loaded road data.
+        """
+        self.roads = None
