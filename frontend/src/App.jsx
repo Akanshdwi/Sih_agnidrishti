@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getMlStatus, getToken, getUser, clearToken, clearUser } from './api.js';
+import { getMlStatus, getIncidents, getToken, getUser, clearToken, clearUser } from './api.js';
 import MapView from './MapView.jsx';
 import AlertFeed from './AlertFeed.jsx';
 import MLPanel from './MLPanel.jsx';
-import LoadingScreen from './LoadingScreen.jsx';
+import EnteringPage from './EnteringPage.jsx';
 import Dashboard from './Dashboard.jsx';
 import LoginPage from './LoginPage.jsx';
 import ProfileBadge from './ProfileBadge.jsx';
@@ -127,17 +127,12 @@ function IncidentsTab() {
 
 /* ─── Main App ────────────────────────────────────────────────────────────── */
 export default function App() {
-    const [showLoader, setShowLoader]     = useState(true);
-    const [mlStatus, setMlStatus]         = useState(null);
+    const [inEntrance, setInEntrance] = useState(true);
+    const [mlStatus, setMlStatus] = useState(null);
     const [hotspotCount, setHotspotCount] = useState(null);
-    const [activeTab, setActiveTab]       = useState('map');
-    const [user, setUser]                 = useState(() => getUser());  // bootstrap from localStorage
-    const authed                          = !!(user && getToken());
-
-    useEffect(() => {
-        const t = setTimeout(() => setShowLoader(false), 1800);
-        return () => clearTimeout(t);
-    }, []);
+    const [activeTab, setActiveTab] = useState('map');
+    const [user, setUser] = useState(() => getUser());
+    const authed = !!(user && getToken());
 
     useEffect(() => {
         if (!authed) return;
@@ -150,8 +145,8 @@ export default function App() {
     const handleAuthSuccess = (u) => setUser(u);
     const handleLogout = () => { clearToken(); clearUser(); setUser(null); };
 
-    if (showLoader) return <LoadingScreen />;
-    if (!authed)    return <LoginPage onAuthSuccess={handleAuthSuccess} />;
+    if (inEntrance) return <EnteringPage onEnterDashboard={() => setInEntrance(false)} />;
+    if (!authed) return <LoginPage onAuthSuccess={handleAuthSuccess} />;
 
     return (
         <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
