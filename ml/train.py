@@ -9,7 +9,7 @@ Pipeline
   5. Ensemble (soft vote / average probabilities)
   6. Evaluate: accuracy, per-class precision/recall/F1
   7. Save models to ml/models/
-
+ 
 Usage
   cd AgniDrishti
   source backend/venv/bin/activate
