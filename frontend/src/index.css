@@ -304,8 +304,6 @@ body {
 
 /* ─── Map action buttons ─────────────────────────────────────────────────────── */
 .map-btn {
-    position: fixed;
-    z-index: 1300;
     display: flex;
     align-items: center;
     gap: 6px;

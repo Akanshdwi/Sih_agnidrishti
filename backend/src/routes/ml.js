@@ -68,24 +68,38 @@ router.post('/run', (req, res) => {
             return;
         }
 
-        // Parse summary from stdout
+        // Parse summary from stdout — JSON-first, regex fallback
         let summary = {};
         try {
-            // Extract key numbers from stdout with regex
-            const total     = stdout.match(/Total:\s+(\d+)/)?.[1];
-            const skipped   = stdout.match(/Skipped:\s+(\d+)/)?.[1];
-            const debunked  = stdout.match(/Debunked:\s+(\d+)/)?.[1];
-            const validated = stdout.match(/Validated:\s+(\d+)/)?.[1];
-            const patched   = stdout.match(/Patched:\s+(\d+)/)?.[1];
-            const incidents = stdout.match(/Incidents:\s+(\d+)/)?.[1];
-            summary = {
-                total:     parseInt(total)     || 0,
-                skipped:   parseInt(skipped)   || 0,
-                debunked:  parseInt(debunked)  || 0,
-                validated: parseInt(validated) || 0,
-                patched:   parseInt(patched)   || 0,
-                incidents: parseInt(incidents) || 0,
-            };
+            const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                summary = {
+                    total:           parseInt(parsed.total)     || 0,
+                    skipped:         parseInt(parsed.skipped)   || 0,
+                    debunked:        parseInt(parsed.debunked)  || 0,
+                    validated:       parseInt(parsed.validated) || 0,
+                    patched:         parseInt(parsed.patched)   || 0,
+                    incidents:       parseInt(parsed.incidents) || 0,
+                    priority_counts: parsed.priority_counts     || {},
+                };
+            } else {
+                const g = (re) => parseInt(stdout.match(re)?.[1]) || 0;
+                summary = {
+                    total:     g(/Total:\s+(\d+)/),
+                    skipped:   g(/Skipped:\s+(\d+)/),
+                    debunked:  g(/Debunked:\s+(\d+)/),
+                    validated: g(/Validated:\s+(\d+)/),
+                    patched:   g(/Patched:\s+(\d+)/),
+                    incidents: g(/Incidents:\s+(\d+)/),
+                    priority_counts: {
+                        CRITICAL: g(/CRITICAL:\s+(\d+)/),
+                        HIGH:     g(/HIGH:\s+(\d+)/),
+                        MODERATE: g(/MODERATE:\s+(\d+)/),
+                        LOW:      g(/LOW:\s+(\d+)/),
+                    },
+                };
+            }
         } catch { /* best-effort */ }
 
         fs.writeFileSync(STATUS_FILE, JSON.stringify({

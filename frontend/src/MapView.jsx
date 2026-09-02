@@ -136,7 +136,7 @@ export default function MapView({ onHotspotCount }) {
     const visibleHotspots = classFiltered;
 
     return (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: '310px', bottom: '60px', zIndex: 1 }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 'var(--sidebar-w)', bottom: 'var(--bottom-h)', zIndex: 1 }}>
             {loading && (
                 <div style={{
                     position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
@@ -221,7 +221,7 @@ export default function MapView({ onHotspotCount }) {
             </div>
 
             {/* Controls overlay */}
-            <div style={{ position: 'absolute', top: 70, left: leftPanelOpen ? 236 : 16, zIndex: 1300, display: 'flex', gap: 10, transition: 'left 0.22s' }}>
+            <div style={{ position: 'absolute', top: 'calc(var(--topbar-h) + 16px)', left: leftPanelOpen ? 236 : 16, zIndex: 1300, display: 'flex', gap: 10, transition: 'left 0.22s' }}>
                 <button 
                     className={`map-btn ${leftPanelOpen ? 'active' : ''}`}
                     onClick={() => setLeftPanelOpen(!leftPanelOpen)}
