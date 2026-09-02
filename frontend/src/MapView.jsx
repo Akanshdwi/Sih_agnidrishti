@@ -136,7 +136,7 @@ export default function MapView({ onHotspotCount }) {
     const visibleHotspots = classFiltered;
 
     return (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 'var(--sidebar-w)', bottom: 'var(--bottom-h)', zIndex: 1 }}>
+        <div style={{ position: 'absolute', top: 'var(--topbar-h)', left: 0, right: 'var(--sidebar-w)', bottom: 'var(--bottom-h)', zIndex: 1 }}>
             {loading && (
                 <div style={{
                     position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
