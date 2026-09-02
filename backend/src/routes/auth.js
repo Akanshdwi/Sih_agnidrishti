@@ -70,18 +70,33 @@ router.post('/register', async (req, res, next) => {
         if (password.length < 8)
             return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
-        // Check email is from an allowed domain (government / trusted orgs)
+        // Allowed domains — government, research, and authorised institutions
         const allowedDomains = [
-            'gov.in', 'nic.in', 'isro.gov.in', 'imd.gov.in',
-            'gsdma.org', 'gujarat.gov.in', 'iitb.ac.in', 'iitgn.ac.in',
+            // Central government
+            'gov.in', 'nic.in',
+            // Key agencies
+            'isro.gov.in', 'imd.gov.in', 'gsdma.org',
+            'gujarat.gov.in', 'ndma.gov.in', 'ndrf.gov.in',
+            // Research & academia
+            'iitb.ac.in', 'iitgn.ac.in', 'iitd.ac.in', 'iitk.ac.in',
+            'iisc.ac.in', 'nit.ac.in', 'bits-pilani.ac.in',
+            // Generic Indian domains (for demo / testing)
+            'in',
         ];
+
         const domain = email.split('@')[1]?.toLowerCase() || '';
-        const domainAllowed = allowedDomains.some(d => domain === d || domain.endsWith(`.${d}`));
+        const DEV_MODE = process.env.NODE_ENV !== 'production';
+
+        // In dev mode, allow any email for testing
+        const domainAllowed = DEV_MODE || allowedDomains.some(d =>
+            domain === d || domain.endsWith(`.${d}`)
+        );
 
         if (!domainAllowed)
             return res.status(403).json({
                 error: 'Registration is restricted to government and authorised institutional email addresses.',
                 allowed_domains: allowedDomains,
+                note: 'Contact admin@agnidrishti.gov.in to request manual access.',
             });
 
         const existing = await pool.query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
