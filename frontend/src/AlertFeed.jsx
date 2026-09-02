@@ -1,57 +1,86 @@
 import { useEffect, useState } from 'react';
+import { getAlerts } from './api.js';
 
-const BASE = 'http://localhost:4000/api';
 const TIER_LABEL = { 1: 'Facility', 2: 'District', 3: 'State', 4: 'National' };
+const TIER_COLOR = { 1: '#22c55e', 2: '#f59e0b', 3: '#ef4444', 4: '#7c3aed' };
+const TIER_BG    = { 1: 'rgba(34,197,94,0.08)', 2: 'rgba(245,158,11,0.08)', 3: 'rgba(239,68,68,0.1)', 4: 'rgba(124,58,237,0.1)' };
+
+function AlertItem({ a }) {
+    const color = TIER_COLOR[a.tier] || '#888';
+    const bg    = TIER_BG[a.tier]    || 'transparent';
+    const isCritical = a.tier >= 3;
+    return (
+        <div style={{
+            padding: '9px 11px',
+            borderRadius: 9,
+            background: bg,
+            borderLeft: `3px solid ${color}`,
+            marginBottom: 6,
+            transition: 'opacity 0.2s',
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span
+                    className={`badge ${isCritical ? 'badge-critical' : a.tier === 2 ? 'badge-high' : 'badge-low'} ${isCritical ? 'pulse' : ''}`}
+                >
+                    T{a.tier} · {TIER_LABEL[a.tier]}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                    {new Date(a.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
+                {a.message}
+            </p>
+        </div>
+    );
+}
 
 export default function AlertFeed() {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const load = () => fetch(`${BASE}/alerts`).then(r => r.json()).then(a => { setAlerts(a); setLoading(false); });
+        const load = () =>
+            getAlerts()
+                .then(a => { setAlerts(Array.isArray(a) ? a : []); setLoading(false); })
+                .catch(() => setLoading(false));
         load();
-        const interval = setInterval(load, 15000);
-        return () => clearInterval(interval);
+        const t = setInterval(load, 15000);
+        return () => clearInterval(t);
     }, []);
 
     return (
-        <div className="card scrollbar-thin" style={{
-            position: 'absolute', top: 70, right: 10, width: 300,
-            maxHeight: 'calc(100vh - 90px)', overflowY: 'auto',
-            padding: 14, zIndex: 1000,
-        }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 15 }}>Alert Feed</h3>
-                <span style={{ fontSize: 11, color: '#888' }}>{alerts.length} total</span>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+            {/* Header */}
+            <div className="sidebar-section" style={{ paddingBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="sidebar-section-title" style={{ margin: 0 }}>Alert Feed</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                        {alerts.length} total · live
+                    </span>
+                </div>
             </div>
 
-            {loading && <p style={{ color: '#888', fontSize: 13 }}>Loading...</p>}
-            {!loading && alerts.length === 0 && (
-                <p style={{ color: '#888', fontSize: 13 }}>No alerts yet — system monitoring.</p>
-            )}
+            {/* List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+                {loading && (
+                    <>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="shimmer" style={{ height: 56, marginBottom: 6, borderRadius: 9 }} />
+                        ))}
+                    </>
+                )}
 
-            {alerts.map(a => (
-                <div key={a.id} style={{
-                    padding: 10, marginBottom: 8, borderRadius: 8,
-                    background: a.tier >= 3 ? '#fef2f2' : a.tier === 2 ? '#fffbeb' : '#f0fdf4',
-                    borderLeft: `4px solid ${a.tier >= 3 ? '#ef4444' : a.tier === 2 ? '#f59e0b' : '#22c55e'}`,
-                    fontSize: 13,
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                        <span className={a.tier >= 3 ? 'pulse' : ''} style={{
-                            padding: '2px 8px', borderRadius: 12, fontSize: 11,
-                            background: a.tier >= 3 ? '#ef4444' : a.tier === 2 ? '#f59e0b' : '#22c55e',
-                            color: 'white',
-                        }}>
-                            Tier {a.tier} · {TIER_LABEL[a.tier]}
-                        </span>
+                {!loading && alerts.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+                        <div style={{ fontSize: 24, marginBottom: 6 }}>🟢</div>
+                        <div>No alerts — system monitoring</div>
+                        <div style={{ fontSize: 10, marginTop: 4 }}>Alerts appear after HIGH/CRITICAL events</div>
                     </div>
-                    <div style={{ marginTop: 6 }}>{a.message}</div>
-                    <div style={{ marginTop: 4, fontSize: 11, color: '#888' }}>
-                        {new Date(a.sent_at).toLocaleString()}
-                    </div>
-                </div>
-            ))}
+                )}
+
+                {alerts.map(a => <AlertItem key={a.id} a={a} />)}
+            </div>
         </div>
     );
 }

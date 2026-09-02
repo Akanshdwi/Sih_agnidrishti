@@ -7,6 +7,7 @@ import hotspots from './routes/hotspots.js';
 import facilities from './routes/facilities.js';
 import incidents from './routes/incidents.js';
 import alerts from './routes/alerts.js';
+import ml from './routes/ml.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -17,6 +18,7 @@ app.use('/api/hotspots', hotspots);
 app.use('/api/facilities', facilities);
 app.use('/api/incidents', incidents);
 app.use('/api/alerts', alerts);
+app.use('/api/ml', ml);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
