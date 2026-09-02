@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const CLASSES = [
     { name: 'Gas Flare',                   color: '#f59e0b', emoji: '🔥' },
@@ -10,21 +10,34 @@ const CLASSES = [
     { name: 'False Positive',              color: '#6b7280', emoji: '✗'  },
 ];
 
+const ALL_NAMES = new Set(CLASSES.map(c => c.name));
+
 export default function ClassFilter({ hotspots, onFilteredChange }) {
-    const [active, setActive] = useState(new Set(CLASSES.map(c => c.name)));
+    const [active, setActive] = useState(ALL_NAMES);
     const [showAll, setShowAll] = useState(true);
+    // Ref so the hotspot-change effect always reads current active without
+    // causing an infinite loop if active were listed as a dependency.
+    const activeRef = useRef(active);
+    activeRef.current = active;
+
+    // Re-emit filtered list whenever hotspots array changes (e.g. 30s refresh)
+    useEffect(() => {
+        onFilteredChange(hotspots.filter(h => {
+            const cls = h.classification || 'False Positive';
+            return activeRef.current.has(cls);
+        }));
+    }, [hotspots, onFilteredChange]);
 
     const toggle = (name) => {
-        const next = new Set(active);
+        const next = new Set(activeRef.current);
         if (next.has(name)) {
-            if (next.size === 1) return; // keep at least one
+            if (next.size === 1) return; // keep at least one active
             next.delete(name);
         } else {
             next.add(name);
         }
         setActive(next);
-        const all = next.size === CLASSES.length;
-        setShowAll(all);
+        setShowAll(next.size === CLASSES.length);
         onFilteredChange(hotspots.filter(h => {
             const cls = h.classification || 'False Positive';
             return next.has(cls);
@@ -33,13 +46,12 @@ export default function ClassFilter({ hotspots, onFilteredChange }) {
 
     const toggleAll = () => {
         if (showAll) {
-            const none = new Set(['Industrial Fire / Accident', 'Gas Flare', 'Wildfire / Forest Fire']);
-            setActive(none);
+            const high = new Set(['Industrial Fire / Accident', 'Gas Flare', 'Wildfire / Forest Fire']);
+            setActive(high);
             setShowAll(false);
-            onFilteredChange(hotspots.filter(h => none.has(h.classification)));
+            onFilteredChange(hotspots.filter(h => high.has(h.classification)));
         } else {
-            const all = new Set(CLASSES.map(c => c.name));
-            setActive(all);
+            setActive(ALL_NAMES);
             setShowAll(true);
             onFilteredChange(hotspots);
         }
@@ -54,17 +66,17 @@ export default function ClassFilter({ hotspots, onFilteredChange }) {
     return (
         <div style={{ width: '100%' }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span className="sidebar-section-title" style={{ margin: 0 }}>Class Filter</span>
                 <button
                     onClick={toggleAll}
                     style={{
                         fontSize: 10, color: '#60a5fa', background: 'none',
                         border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0,
-                        textTransform: 'uppercase', letterSpacing: 0.5
+                        textTransform: 'uppercase', letterSpacing: 0.5,
                     }}
                 >
-                    {showAll ? 'High-risk' : 'Show all'}
+                    {showAll ? 'High-risk only' : 'Show all'}
                 </button>
             </div>
 
