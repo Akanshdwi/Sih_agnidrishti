@@ -51,7 +51,10 @@
   object-position: center;
   display: block;
   z-index: 0;
+  opacity: 0;
+  transition: opacity 550ms ease;
 }
+.earth-video-bg.active { opacity: 1; }
 .space-color-wash { z-index: -6; background: linear-gradient(90deg, rgba(2, 5, 10, 0.05) 0%, rgba(2, 5, 10, 0.07) 36%, rgba(2, 5, 10, 0.32) 65%, rgba(2, 5, 10, 0.76) 100%), linear-gradient(0deg, rgba(2, 5, 10, 0.32), transparent 40%, rgba(2, 5, 10, 0.16)); }
 .stars-canvas { z-index: -5; opacity: 0.92; }
 .atmosphere-glow { z-index: -4; background: radial-gradient(ellipse 52% 62% at 42% 46%, rgba(0, 183, 255, 0.1), transparent 72%), radial-gradient(ellipse 34% 44% at 25% 58%, rgba(245, 183, 86, 0.12), transparent 75%), radial-gradient(ellipse 28% 38% at 82% 48%, rgba(255, 207, 122, 0.08), transparent 75%); }

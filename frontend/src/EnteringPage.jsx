@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./EnteringPage.css";
+import useSeamlessVideo from "./useSeamlessVideo.js";
 
 const EARTH_ROTATION_VIDEO = "/assets/upscaled-video.mp4";
 
@@ -12,6 +13,7 @@ export default function EnteringPage({ onEnter, onEnterDashboard }) {
   const [fadeOut, setFadeOut] = useState(false);
   const [hudTime, setHudTime] = useState("");
   const enterTimerRef = useRef(null);
+  const { videoRefs, activeIndex, handleTimeUpdate, handleEnded } = useSeamlessVideo();
 
   const particles = useMemo(
     () =>
@@ -51,16 +53,21 @@ export default function EnteringPage({ onEnter, onEnterDashboard }) {
   return (
     <main className={`entering-page ${fadeOut ? "fade-out" : ""}`}>
       {/* Full-screen Video Background */}
-      <video
-        className="earth-video-bg"
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="auto"
-      >
-        <source src={EARTH_ROTATION_VIDEO} type="video/mp4" />
-      </video>
+      {[0, 1].map(index => (
+        <video
+          key={index}
+          ref={video => { videoRefs.current[index] = video; }}
+          className={`earth-video-bg ${activeIndex === index ? "active" : ""}`}
+          autoPlay={index === 0}
+          muted
+          playsInline
+          preload="auto"
+          onTimeUpdate={() => handleTimeUpdate(index)}
+          onEnded={() => handleEnded(index)}
+        >
+          <source src={EARTH_ROTATION_VIDEO} type="video/mp4" />
+        </video>
+      ))}
 
       {/* Subtle cinematic vignette overlay */}
       <div className="vignette" aria-hidden="true" />
