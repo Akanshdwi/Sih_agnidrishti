@@ -1,11 +1,30 @@
 import { useEffect, useState } from 'react';
-import { getAlerts } from './api.js';
+import { getAlerts, getIncidentReport } from './api.js';
 
 const TIER_LABEL = { 1: 'Facility', 2: 'District', 3: 'State', 4: 'National' };
 const TIER_COLOR = { 1: '#22c55e', 2: '#f59e0b', 3: '#ef4444', 4: '#7c3aed' };
 const TIER_BG    = { 1: 'rgba(34,197,94,0.08)', 2: 'rgba(245,158,11,0.08)', 3: 'rgba(239,68,68,0.1)', 4: 'rgba(124,58,237,0.1)' };
 
 function AlertItem({ a }) {
+    const [report, setReport] = useState(null);
+    const [loadingReport, setLoadingReport] = useState(false);
+    
+    const fetchReport = async () => {
+        if (report) {
+            setReport(null); // toggle off
+            return;
+        }
+        setLoadingReport(true);
+        try {
+            const data = await getIncidentReport(a.incident_id);
+            setReport(data.report || 'No report available.');
+        } catch (err) {
+            setReport('Error generating report.');
+        } finally {
+            setLoadingReport(false);
+        }
+    };
+
     const color = TIER_COLOR[a.tier] || '#888';
     const bg    = TIER_BG[a.tier]    || 'transparent';
     const isCritical = a.tier >= 3;
@@ -31,6 +50,38 @@ function AlertItem({ a }) {
             <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
                 {a.message}
             </p>
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                    onClick={fetchReport}
+                    disabled={loadingReport}
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 6,
+                        padding: '4px 8px',
+                        fontSize: 10,
+                        color: '#60a5fa',
+                        cursor: 'pointer',
+                    }}
+                >
+                    {loadingReport ? 'Generating...' : report ? 'Hide AI Report' : '✨ AI Report'}
+                </button>
+            </div>
+            {report && (
+                <div style={{
+                    marginTop: 8,
+                    padding: '8px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    color: '#e2e8f0',
+                    lineHeight: 1.4,
+                    fontStyle: 'italic',
+                    borderLeft: '2px solid #60a5fa'
+                }}>
+                    {report}
+                </div>
+            )}
         </div>
     );
 }

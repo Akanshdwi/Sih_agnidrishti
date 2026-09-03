@@ -54,6 +54,7 @@ export const getHotspots  = async (params = {}) => {
 export const getFacilities  = async ()  => (await apiFetch(`${BASE}/facilities`)).json();
 export const getFacility    = async (id)=> (await apiFetch(`${BASE}/facilities/${id}`)).json();
 export const getIncidents   = async ()  => (await apiFetch(`${BASE}/incidents`)).json();
+export const getIncidentReport = async (id) => (await apiFetch(`${BASE}/incidents/${id}/report`)).json();
 export const getAlerts      = async ()  => (await apiFetch(`${BASE}/alerts`)).json();
 export const getMlStatus    = async ()  => (await apiFetch(`${BASE}/ml/status`)).json();
 export const runMlPipeline  = async (writeBack = true) =>

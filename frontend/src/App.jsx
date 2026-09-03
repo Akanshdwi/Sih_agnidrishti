@@ -3,7 +3,7 @@ import { getMlStatus, getToken, getUser, clearToken, clearUser } from './api.js'
 import MapView from './MapView.jsx';
 import AlertFeed from './AlertFeed.jsx';
 import MLPanel from './MLPanel.jsx';
-import LoadingScreen from './LoadingScreen.jsx';
+import EnteringPage from './EnteringPage.jsx';
 import Dashboard from './Dashboard.jsx';
 import LoginPage from './LoginPage.jsx';
 import ProfileBadge from './ProfileBadge.jsx';
@@ -125,61 +125,6 @@ function IncidentsTab() {
     );
 }
 
-/* ─── Main App ────────────────────────────────────────────────────────────── */
-export default function App() {
-    const [showLoader, setShowLoader]     = useState(true);
-    const [mlStatus, setMlStatus]         = useState(null);
-    const [hotspotCount, setHotspotCount] = useState(null);
-    const [activeTab, setActiveTab]       = useState('map');
-    const [user, setUser]                 = useState(() => getUser());  // bootstrap from localStorage
-    const authed                          = !!(user && getToken());
-
-    useEffect(() => {
-        getIncidents()
-            .then(d => { setIncidents(Array.isArray(d) ? d : []); setLoading(false); })
-            .catch(() => setLoading(false));
-    }, []);
-
-    const priorities = ['ALL', 'CRITICAL', 'HIGH', 'MODERATE', 'LOW'];
-    const visible = filter === 'ALL' ? incidents : incidents.filter(i => i.threat_priority === filter);
-
-    return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Filter pills */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
-                {priorities.map(p => (
-                    <button key={p} onClick={() => setFilter(p)} style={{
-                        padding: '4px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                        cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
-                        letterSpacing: 0.5, transition: 'all 0.15s',
-                        background: filter === p ? `${PRIORITY_COLOR[p] || 'rgba(59,130,246'}0.2` : 'rgba(255,255,255,0.04)',
-                        border: filter === p
-                            ? `1px solid ${PRIORITY_COLOR[p] || '#3b82f6'}60`
-                            : '1px solid var(--border)',
-                        color: filter === p ? (PRIORITY_COLOR[p] || '#60a5fa') : 'var(--text-secondary)',
-                    }}>{p}</button>
-                ))}
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
-                    {visible.length} incidents
-                </span>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-                {loading && [1,2,3].map(i => (
-                    <div key={i} className="shimmer" style={{ height: 72, borderRadius: 10, marginBottom: 8 }} />
-                ))}
-                {!loading && visible.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-                        <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-                        <div style={{ fontSize: 13 }}>No incidents yet</div>
-                        <div style={{ fontSize: 11, marginTop: 4 }}>Run the ML pipeline to generate incident reports</div>
-                    </div>
-                )}
-                {visible.map(inc => <IncidentRow key={inc.id} inc={inc} />)}
-            </div>
-        </div>
-    );
-}
 
 /* ─── Main App ────────────────────────────────────────────────────────────── */
 export default function App() {
@@ -201,7 +146,7 @@ export default function App() {
     const handleAuthSuccess = (u) => setUser(u);
     const handleLogout = () => { clearToken(); clearUser(); setUser(null); };
 
-    if (showLoader) return <LoadingScreen />;
+    if (inEntrance) return <EnteringPage onEnter={() => setInEntrance(false)} />;
     if (!authed)    return <LoginPage onAuthSuccess={handleAuthSuccess} />;
 
     return (
