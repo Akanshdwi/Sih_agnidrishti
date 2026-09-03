@@ -146,7 +146,12 @@ export default function App() {
     const handleAuthSuccess = (u) => setUser(u);
     const handleLogout = () => { clearToken(); clearUser(); setUser(null); };
 
-    if (inEntrance) return <EnteringPage onEnter={() => setInEntrance(false)} />;
+    if (inEntrance && !authed) return (
+        <>
+            <LoginPage onAuthSuccess={handleAuthSuccess} />
+            <EnteringPage onEnter={() => setInEntrance(false)} />
+        </>
+    );
     if (!authed)    return <LoginPage onAuthSuccess={handleAuthSuccess} />;
 
     return (
