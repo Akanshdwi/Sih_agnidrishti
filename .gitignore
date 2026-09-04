@@ -14,6 +14,20 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
+# Python test and tooling caches
+.pytest_cache/
+.venv/
+venv/
+
+# Generated ML artifacts
+backend/app/ml/models/*.pkl
+backend/app/ml/models/model_metadata.json
+backend/app/ml/benchmark_input/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
 data/raw/osm/*.osm.pbf
 data/raw/**/*.tif
 data/processed/
