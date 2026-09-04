@@ -4,7 +4,7 @@ CREATE TABLE facilities (
   id SERIAL PRIMARY KEY,
   name TEXT,
   type TEXT,               -- refinery, power_plant, mine, lng, etc
-  osm_id TEXT,
+  osm_id TEXT UNIQUE,
   geom GEOMETRY(Polygon, 4326),
   created_at TIMESTAMPTZ DEFAULT now()
 );

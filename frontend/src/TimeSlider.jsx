@@ -1,40 +1,56 @@
 import { useMemo, useState, useEffect } from 'react';
 
 export default function TimeSlider({ hotspots, onFilteredChange }) {
-    const [dayOffset, setDayOffset] = useState(30);
+    const [pct, setPct] = useState(100); // 0–100% through the date range
 
-    const { minDate, maxDate } = useMemo(() => {
-        if (!hotspots.length) return { minDate: null, maxDate: null };
+    const { minDate, maxDate, isSingleDay } = useMemo(() => {
+        if (!hotspots.length) return { minDate: null, maxDate: null, isSingleDay: false };
         const dates = hotspots.map(h => new Date(h.acq_date).getTime());
-        return { minDate: Math.min(...dates), maxDate: Math.max(...dates) };
+        const mn = Math.min(...dates);
+        const mx = Math.max(...dates);
+        return { minDate: mn, maxDate: mx, isSingleDay: mn === mx };
     }, [hotspots]);
 
     useEffect(() => {
         if (!minDate || !maxDate) return;
-        const cutoff = minDate + ((maxDate - minDate) * dayOffset) / 30;
+        if (isSingleDay) {
+            // All hotspots on same date — show everything
+            onFilteredChange(hotspots);
+            return;
+        }
+        const cutoff = minDate + ((maxDate - minDate) * pct) / 100;
         onFilteredChange(hotspots.filter(h => new Date(h.acq_date).getTime() <= cutoff));
-    }, [dayOffset, hotspots, minDate, maxDate, onFilteredChange]);
+    }, [pct, hotspots, minDate, maxDate, isSingleDay, onFilteredChange]);
 
     if (!minDate) return null;
 
-    const cutoffDate = new Date(minDate + ((maxDate - minDate) * dayOffset) / 30);
+    const cutoffDate = isSingleDay
+        ? new Date(maxDate)
+        : new Date(minDate + ((maxDate - minDate) * pct) / 100);
+
+    const fmtDate = (ts) =>
+        new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
     return (
-        <div className="card" style={{
-            position: 'absolute', bottom: 10, right: 10, left: 370,
-            padding: '12px 20px', zIndex: 1000,
-        }}>
-            <div style={{ fontSize: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                <span>{new Date(minDate).toLocaleDateString()}</span>
-                <b style={{ color: '#1e293b' }}>{cutoffDate.toLocaleString()}</b>
-                <span>{new Date(maxDate).toLocaleDateString()}</span>
-            </div>
+        <div className="timeslider-bar">
+            <div className="slider-label">Timeline</div>
+            <span className="slider-date">{fmtDate(minDate)}</span>
             <input
-                type="range" className="slider-track"
-                min={0} max={30} step={0.1}
-                value={dayOffset}
-                onChange={e => setDayOffset(Number(e.target.value))}
+                type="range"
+                className="slider-track"
+                min={0} max={100} step={0.5}
+                value={pct}
+                disabled={isSingleDay}
+                onChange={e => setPct(Number(e.target.value))}
             />
+            <span className="slider-date" style={{ color: 'var(--text-primary)' }}>
+                {cutoffDate.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+            {isSingleDay && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    (single day)
+                </span>
+            )}
         </div>
     );
 }
