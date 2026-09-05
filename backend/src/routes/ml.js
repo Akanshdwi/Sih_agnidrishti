@@ -3,6 +3,7 @@ import { exec } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import { predictWithModel } from '../mlBridge.js';
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -112,6 +113,21 @@ router.post('/run', (req, res) => {
 
         console.log(`[ML Pipeline] Completed at ${finishedAt}`, summary);
     });
+});
+
+router.post('/predict', async (req, res, next) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A feature record JSON object is required' });
+  }
+
+  try {
+    const prediction = await predictWithModel(req.body);
+    return res.json(prediction);
+  } catch (error) {
+    error.status = 503;
+    error.message = `ML prediction unavailable: ${error.message}`;
+    return next(error);
+  }
 });
 
 export default router;

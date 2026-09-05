@@ -61,3 +61,12 @@ export const runMlPipeline  = async (writeBack = true) =>
     (await apiFetch(`${BASE}/ml/run?write_back=${writeBack}`, { method: 'POST' })).json();
 
 export { BASE };
+
+export const evaluateIncident = async (hotspot) => {
+    const response = await apiFetch(`${BASE}/incidents/evaluate`, {
+        method: 'POST',
+        body: JSON.stringify(hotspot),
+    });
+    if (!response.ok) throw new Error('Incident evaluation failed');
+    return response.json();
+};

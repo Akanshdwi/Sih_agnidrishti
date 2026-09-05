@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON } from 'react-leaflet';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { getHotspots, getFacilities } from './api.js';
+import { evaluateIncident, getHotspots, getFacilities } from './api.js';
 import FacilityPanel from './FacilityPanel.jsx';
 import TimeSlider from './TimeSlider.jsx';
 import Legend from './Legend.jsx';
@@ -25,7 +25,7 @@ const RISK_COLOR = (score) => {
     return '#22c55e';
 };
 
-function HotspotPopup({ h }) {
+function HotspotPopup({ h, evaluation, onEvaluate }) {
     const cls = h.classification || 'Unclassified';
     const risk = h.risk_score;
     const clsColor = COLORS[cls] || '#9ca3af';
@@ -89,6 +89,28 @@ function HotspotPopup({ h }) {
                         {h.explanation}
                     </div>
                 )}
+
+                <button onClick={() => onEvaluate(h)} style={{
+                    margin: '0 8px 8px', padding: '6px 8px', border: 'none',
+                    borderRadius: 6, background: '#0f766e', color: 'white',
+                    cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                }}>
+                    Evaluate incident
+                </button>
+                {evaluation && !evaluation.error && (
+                    <div style={{ margin: '0 8px 8px', borderTop: '1px solid #e2e8f0', paddingTop: 6 }}>
+                        <b>{evaluation.status}</b> · {evaluation.risk_score}/100
+                        <div style={{ color: '#475569', fontSize: 11, marginTop: 3 }}>
+                            {evaluation.reasons.join('; ')}
+                        </div>
+                        {evaluation.ml_prediction && (
+                            <div style={{ color: '#0f766e', fontSize: 11, marginTop: 5 }}>
+                                ML: {evaluation.ml_prediction.threat_short_name} · {Math.round(evaluation.ml_prediction.confidence * 100)}% confidence · {evaluation.ml_prediction.severity_tier}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {evaluation?.error && <div style={{ color: '#b91c1c', margin: '0 8px 8px', fontSize: 11 }}>{evaluation.error}</div>}
             </div>
         </div>
     );
@@ -103,6 +125,28 @@ export default function MapView({ onHotspotCount }) {
     const [loading, setLoading]                 = useState(true);
     const [show3D, setShow3D]                   = useState(false);
     const [leftPanelOpen, setLeftPanelOpen]     = useState(true);
+    const [evaluations, setEvaluations]         = useState({});
+
+    const handleEvaluate = async (hotspot) => {
+        try {
+            const evaluation = await evaluateIncident({
+                event_id: hotspot.id,
+                frp: hotspot.frp,
+                confidence: hotspot.confidence,
+                is_night: hotspot.is_night,
+                nearest_industrial_distance_m: hotspot.nearest_industrial_distance_m,
+                industrial_count: hotspot.industrial_count,
+                nearest_settlement_distance_m: hotspot.nearest_settlement_distance_m,
+                settlement_count: hotspot.settlement_count,
+                building_count: hotspot.building_count,
+                is_vegetation: hotspot.is_vegetation,
+                is_cropland: hotspot.is_cropland,
+            });
+            setEvaluations(current => ({ ...current, [hotspot.id]: evaluation }));
+        } catch (error) {
+            setEvaluations(current => ({ ...current, [hotspot.id]: { error: error.message } }));
+        }
+    };
 
     const loadData = useCallback(() => {
         Promise.all([getHotspots(), getFacilities()])
@@ -207,7 +251,7 @@ export default function MapView({ onHotspotCount }) {
                                 weight: weight,
                             }}
                         >
-                            <Popup maxWidth={260}><HotspotPopup h={h} /></Popup>
+                            <Popup maxWidth={260}><HotspotPopup h={h} evaluation={evaluations[h.id]} onEvaluate={handleEvaluate} /></Popup>
                         </CircleMarker>
                     );
                 })}
