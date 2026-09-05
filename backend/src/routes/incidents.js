@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { dispatchAlert } from '../notify.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { predictWithModel } from '../mlBridge.js';
 
 const router = Router();
 
@@ -10,6 +11,62 @@ router.get('/', async (req, res, next) => {
         const { rows } = await pool.query(`SELECT * FROM incidents ORDER BY created_at DESC LIMIT 500`);
         res.json(rows);
     } catch (err) { next(err); }
+});
+
+// POST /api/incidents/evaluate -- rule-based detector/skeptic preview
+router.post('/evaluate', (req, res) => {
+    const record = req.body || {};
+    const frp = Number(record.frp || 0);
+    const confidence = Number(record.confidence_score ?? record.confidence ?? 0);
+    const industrialDistance = Number(record.nearest_industrial_distance_m ?? 5000);
+    const industrialCount = Number(record.industrial_count || 0);
+    const settlementDistance = Number(record.nearest_settlement_distance_m ?? 5000);
+    const settlementCount = Number(record.settlement_count || 0);
+    const buildingCount = Number(record.building_count || 0);
+    const reasons = [];
+    let score = 0;
+
+    if (frp >= 30) { score += 20; reasons.push(`High fire radiative power (FRP: ${frp.toFixed(1)} MW)`); }
+    else if (frp >= 10) { score += 12; reasons.push(`Moderate fire radiative power (FRP: ${frp.toFixed(1)} MW)`); }
+    else if (frp > 0) { score += 5; reasons.push(`Low fire intensity detected (FRP: ${frp.toFixed(1)} MW)`); }
+    if (confidence >= 0.8) { score += 5; reasons.push(`High satellite detection confidence (${Math.round(confidence * 100)}%)`); }
+    if (Number(record.is_night || 0) === 1) { score += 5; reasons.push('Night-time fire detection (delayed response risk)'); }
+
+    if (industrialCount > 0 || industrialDistance <= 1000) {
+        score += industrialDistance <= 500 ? 25 : 15;
+        reasons.push(`Industrial hazard proximity (${industrialDistance.toFixed(0)}m)`);
+    }
+    if (settlementCount > 0 || settlementDistance <= 500) {
+        score += settlementDistance <= 300 ? 15 : 10;
+        reasons.push(`Settlement proximity (${settlementDistance.toFixed(0)}m)`);
+    }
+    if (buildingCount >= 5) { score += 10; reasons.push(`High building density (${buildingCount})`); }
+    else if (buildingCount > 0) { score += 5; reasons.push(`Nearby buildings (${buildingCount})`); }
+    if (Number(record.is_vegetation || 0) === 1) { score += 15; reasons.push('Vegetation fuel load'); }
+    else if (Number(record.is_cropland || 0) === 1) { score += 10; reasons.push('Cropland spread risk'); }
+
+    score = Math.min(100, Math.max(0, score));
+    const riskLevel = score <= 35 ? 'LOW' : score <= 70 ? 'MEDIUM' : 'HIGH';
+    const suppressed = confidence < 0.3 && score < 85;
+    const status = suppressed ? 'SUPPRESSED' : score >= 70 ? 'VALIDATED' : 'MONITORED';
+
+    if (suppressed) reasons.push('Low satellite confidence and no critical risk evidence.');
+    if (reasons.length === 0) reasons.push('Baseline low-intensity event with no immediate nearby hazards.');
+
+    const response = {
+        event_id: record.event_id || null,
+        status,
+        detected: true,
+        risk_score: score,
+        risk_level: riskLevel,
+        confidence,
+        dispatch_required: status === 'VALIDATED',
+        reasons,
+    };
+
+    predictWithModel(record)
+        .then((prediction) => res.json({ ...response, ml_prediction: prediction }))
+        .catch(() => res.json({ ...response, ml_prediction: null }));
 });
 
 // POST /api/incidents -- multi-agent pipeline pushes final verdict here
