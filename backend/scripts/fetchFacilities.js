@@ -1,6 +1,6 @@
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const API_BASE = 'http://localhost:4000/api';
-
+const TOKEN = process.env.API_TOKEN;
 // Gujarat refinery belt bbox (south,west,north,east) — swap for your region
 const BBOX = '21.0,68.5,23.5,73.5';
 
@@ -60,9 +60,13 @@ async function main() {
 
     console.log(`Fetched ${facilities.length} facilities. Posting to backend...`);
 
+
     const post = await fetch(`${API_BASE}/facilities/bulk`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${TOKEN}`,
+        },
         body: JSON.stringify(facilities),
     });
 
