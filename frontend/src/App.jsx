@@ -8,7 +8,7 @@ import LoginPage from './LoginPage.jsx';
 import ProfileBadge from './ProfileBadge.jsx';
 import LandingHome from './LandingHome.tsx';
 
-/* ─── Tab config ────────────────────────────────────────────────────────── */
+/* ─── Tab config ─────────────────────────────────────────────────────────── */
 const TABS = [
     { id: 'map',       label: '🗺️  Live Map' },
     { id: 'dashboard', label: '📊 Dashboard' },
@@ -62,7 +62,7 @@ function IncidentRow({ inc }) {
                     }}>{s}</span>
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                    {new Date(inc.created_at).toLocaleString()}
+                    {inc.created_at ? new Date(inc.created_at).toLocaleString() : '—'}
                 </span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -85,7 +85,7 @@ function IncidentsTab() {
     }, []);
 
     const priorities = ['ALL', 'CRITICAL', 'HIGH', 'MODERATE', 'LOW'];
-    const visible = filter === 'ALL' ? incidents : incidents.filter(i => i.threat_priority === filter);
+    const visible = filter === 'ALL' ? incidents : incidents.filter(i => (i.threat_priority || 'LOW') === filter);
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -101,7 +101,15 @@ function IncidentsTab() {
                             ? `1px solid ${PRIORITY_COLOR[p] || '#3b82f6'}60`
                             : '1px solid var(--border)',
                         color: filter === p ? (PRIORITY_COLOR[p] || '#60a5fa') : 'var(--text-secondary)',
-                    }}>{p}</button>
+                        outline: 'none',
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setFilter(p);
+                        }
+                    }}
+                    >{p}</button>
                 ))}
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
                     {visible.length} incidents
@@ -126,7 +134,7 @@ function IncidentsTab() {
 }
 
 
-/* ─── Main App ────────────────────────────────────────────────────────────── */
+/* ─── Main App ─────────────────────────────────────────────────────────── */
 export default function App() {
     const [user, setUser] = useState(() => getUser());
     const authed = !!(user && getToken());
@@ -135,6 +143,17 @@ export default function App() {
     const [hotspotCount, setHotspotCount] = useState(null);
     const [activeTab, setActiveTab] = useState('map');
     const [landingEntrance, setLandingEntrance] = useState(false);
+
+    // Handle auth-expired event from API
+    useEffect(() => {
+        const handleAuthExpired = () => {
+            setUser(null);
+            setViewMode('login');
+            console.warn('[App] Auth expired, redirecting to login');
+        };
+        window.addEventListener('auth-expired', handleAuthExpired);
+        return () => window.removeEventListener('auth-expired', handleAuthExpired);
+    }, []);
 
     useEffect(() => {
         if (!authed) return;
@@ -274,7 +293,7 @@ export default function App() {
 
                 <div className="topbar-right">
                     <TopbarBadge status={mlStatus} />
-                    <ProfileBadge user={user} onLogout={handleLogout} />
+                    <ProfileBadge user={user || undefined} onLogout={handleLogout} />
                 </div>
             </header>
 
