@@ -2,12 +2,11 @@ import 'dotenv/config';
 
 const MAP_KEY = process.env.FIRMS_MAP_KEY;
 const API_BASE = 'http://localhost:4000/api';
+const TOKEN = process.env.API_TOKEN;
 
-// area API: source/MAP_KEY/AREA/dayRange/date
-// VIIRS_SNPP_NRT | VIIRS_NOAA20_NRT | VIIRS_NOAA21_NRT
 const SOURCE = 'VIIRS_SNPP_NRT';
-const AREA = '68.5,21.0,73.5,23.5'; // west,south,east,north
-const DAY_RANGE = 5; // max 5 per call on free tier for area API
+const AREA = '68.5,21.0,73.5,23.5';
+const DAY_RANGE = 5;
 
 function parseCsv(text) {
     const [headerLine, ...lines] = text.trim().split('\n');
@@ -20,6 +19,7 @@ function parseCsv(text) {
 
 async function main() {
     if (!MAP_KEY) throw new Error('FIRMS_MAP_KEY missing in .env');
+    if (!TOKEN) throw new Error('API_TOKEN missing — run with API_TOKEN=<token> node scripts/fetchFirms.js');
 
     const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${MAP_KEY}/${SOURCE}/${AREA}/${DAY_RANGE}`;
     console.log('Fetching FIRMS data...');
@@ -42,11 +42,16 @@ async function main() {
             confidence: row.confidence,
             raw: row,
         };
+
         const post = await fetch(`${API_BASE}/hotspots`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${TOKEN}`,
+            },
             body: JSON.stringify(payload),
         });
+
         if (post.ok) {
             ok++;
         } else {
