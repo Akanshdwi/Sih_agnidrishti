@@ -8,7 +8,7 @@ import LoginPage from './LoginPage.jsx';
 import ProfileBadge from './ProfileBadge.jsx';
 import LandingHome from './LandingHome.tsx';
 
-/* ─── Tab config ─────────────────────────────────────────────────────────── */
+/* ─── Tab config ────────────────────────────────────────────────────────── */
 const TABS = [
     { id: 'map',       label: '🗺️  Live Map' },
     { id: 'dashboard', label: '📊 Dashboard' },
@@ -96,7 +96,7 @@ function IncidentsTab() {
                         padding: '4px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700,
                         cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
                         letterSpacing: 0.5, transition: 'all 0.15s',
-                        background: filter === p ? `${PRIORITY_COLOR[p] || 'rgba(59,130,246'}0.2` : 'rgba(255,255,255,0.04)',
+                        background: filter === p ? (PRIORITY_COLOR[p] ? `${PRIORITY_COLOR[p]}20` : 'rgba(59,130,246,0.2)') : 'rgba(255,255,255,0.04)',
                         border: filter === p
                             ? `1px solid ${PRIORITY_COLOR[p] || '#3b82f6'}60`
                             : '1px solid var(--border)',
