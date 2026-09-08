@@ -4,6 +4,12 @@
  * Summary cards + charts using recharts (already installed).
  * Shows: detection stats, priority breakdown, classification distribution,
  * FRP trend, and alert history.
+ * 
+ * Improvements:
+ * - Defensive guards for numeric fields (FRP, risk_score) to prevent NaN crashes
+ * - Stable date sorting using ISO dates instead of locale strings
+ * - Better empty state messaging with CTAs to run ML
+ * - Format validation for all numeric calculations
  */
 import { useState, useEffect } from 'react';
 import {
@@ -25,6 +31,28 @@ const CLASS_COLORS = {
 };
 const PRIORITY_COLORS = { CRITICAL: '#ef4444', HIGH: '#f97316', MODERATE: '#f59e0b', LOW: '#22c55e' };
 const RISK_COLOR = s => s >= 76 ? '#ef4444' : s >= 56 ? '#f97316' : s >= 31 ? '#f59e0b' : '#22c55e';
+
+/* ─── Numeric validation helpers ─────────────────────────────────────────── */
+const safeNumber = (val, defaultVal = 0) => {
+    const n = parseFloat(val);
+    return isNaN(n) ? defaultVal : n;
+};
+
+const formatNumber = (val, decimals = 1) => {
+    const n = safeNumber(val, 0);
+    return n.toFixed(decimals);
+};
+
+const safeDateString = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD
+    } catch {
+        return null;
+    }
+};
 
 /* ─── Small reusables ────────────────────────────────────────────────────── */
 function Card({ children, style = {} }) {
@@ -93,6 +121,27 @@ function DarkTooltip({ active, payload, label }) {
     );
 }
 
+function NoData({ msg, icon = '📊', cta = null, onCta = null }) {
+    return (
+        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
+            <div style={{ fontSize: 12 }}>{msg}</div>
+            {cta && onCta && (
+                <button
+                    onClick={onCta}
+                    style={{
+                        marginTop: 12, padding: '6px 12px', borderRadius: 6,
+                        border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.1)',
+                        color: '#60a5fa', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                    }}
+                >
+                    {cta}
+                </button>
+            )}
+        </div>
+    );
+}
+
 /* ─── Main Dashboard ─────────────────────────────────────────────────────── */
 export default function Dashboard({ mlStatus, onRunML }) {
     const [hotspots, setHotspots] = useState([]);
@@ -107,18 +156,22 @@ export default function Dashboard({ mlStatus, onRunML }) {
                 setAlerts(Array.isArray(a) ? a : []);
                 setLoading(false);
             })
-            .catch(() => setLoading(false));
+            .catch(() => {
+                setHotspots([]);
+                setAlerts([]);
+                setLoading(false);
+            });
     }, []);
 
-    /* ── Derived stats ── */
+    /* ── Derived stats with defensive guards ── */
     const classified   = hotspots.filter(h => h.classification && h.classification !== 'False Positive');
     const falsePos     = hotspots.filter(h => h.classification === 'False Positive');
-    const critical     = hotspots.filter(h => (h.risk_score || 0) >= 76);
+    const critical     = hotspots.filter(h => safeNumber(h.risk_score, 0) >= 76);
     const avgFrp       = hotspots.length
-        ? (hotspots.reduce((s, h) => s + (h.frp || 0), 0) / hotspots.length).toFixed(1)
+        ? (hotspots.reduce((s, h) => s + safeNumber(h.frp, 0), 0) / hotspots.length).toFixed(1)
         : '—';
     const maxFrp       = hotspots.length
-        ? Math.max(...hotspots.map(h => h.frp || 0)).toFixed(1)
+        ? Math.max(...hotspots.map(h => safeNumber(h.frp, 0))).toFixed(1)
         : '—';
 
     /* ── Classification pie data ── */
@@ -131,10 +184,10 @@ export default function Dashboard({ mlStatus, onRunML }) {
         .sort((a, b) => b[1] - a[1])
         .map(([name, value]) => ({ name, value }));
 
-    /* ── Risk distribution bar ── */
+    /* ── Risk distribution bar with safe scoring ── */
     const riskBuckets = { 'Critical (76–100)': 0, 'High (56–75)': 0, 'Moderate (31–55)': 0, 'Low (0–30)': 0 };
     for (const h of hotspots) {
-        const s = h.risk_score || 0;
+        const s = safeNumber(h.risk_score, 0);
         if (s >= 76) riskBuckets['Critical (76–100)']++;
         else if (s >= 56) riskBuckets['High (56–75)']++;
         else if (s >= 31) riskBuckets['Moderate (31–55)']++;
@@ -146,28 +199,43 @@ export default function Dashboard({ mlStatus, onRunML }) {
         ],
     }));
 
-    /* ── Daily detection trend ── */
+    /* ── Daily detection trend with stable date keys ── */
     const dailyCounts = {};
     for (const h of hotspots) {
-        if (!h.acq_date) continue;
-        const day = new Date(h.acq_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-        dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+        const dateKey = safeDateString(h.acq_date);
+        if (!dateKey) continue;
+        dailyCounts[dateKey] = (dailyCounts[dateKey] || 0) + 1;
     }
     const trendData = Object.entries(dailyCounts)
-        .sort((a, b) => new Date(a[0]) - new Date(b[0]))
+        .sort((a, b) => a[0].localeCompare(b[0])) // ISO date string comparison is stable
         .slice(-14)
-        .map(([date, count]) => ({ date, count }));
+        .map(([date, count]) => {
+            const d = new Date(date);
+            return {
+                date: d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+                count,
+            };
+        });
 
     /* ── Alert tier summary ── */
     const tierCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
-    for (const a of alerts) tierCounts[a.tier] = (tierCounts[a.tier] || 0) + 1;
+    for (const a of alerts) {
+        const tier = parseInt(a.tier) || 1;
+        tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+    }
 
     const handleRunML = async () => {
         if (mlRunning) return;
         setMlRunning(true);
-        await runMlPipeline(true).catch(() => {});
-        setMlRunning(false);
-        getMlStatus().then(onRunML).catch(() => {});
+        try {
+            await runMlPipeline(true);
+            const status = await getMlStatus();
+            onRunML(status);
+        } catch (e) {
+            console.error('ML pipeline error:', e);
+        } finally {
+            setMlRunning(false);
+        }
     };
 
     if (loading) {
@@ -210,8 +278,8 @@ export default function Dashboard({ mlStatus, onRunML }) {
                 <StatCard icon="🔥" label="Total Detections" value={hotspots.length.toLocaleString()} color="#f97316" sub="All time · VIIRS SNPP" />
                 <StatCard icon="⚡" label="Classified Events" value={classified.length.toLocaleString()} color="#a78bfa" sub="ML-confirmed real fires" />
                 <StatCard icon="🚨" label="Critical Risk" value={critical.length.toLocaleString()} color="#ef4444" sub="Risk score ≥ 76/100" />
-                <StatCard icon="📡" label="Avg FRP" value={`${avgFrp} MW`} color="#60a5fa" sub="Fire Radiative Power" />
-                <StatCard icon="🌡️" label="Peak FRP" value={`${maxFrp} MW`} color="#f59e0b" sub="Max detected intensity" />
+                <StatCard icon="📡" label="Avg FRP" value={`${formatNumber(avgFrp, 1)} MW`} color="#60a5fa" sub="Fire Radiative Power" />
+                <StatCard icon="🌡️" label="Peak FRP" value={`${formatNumber(maxFrp, 1)} MW`} color="#f59e0b" sub="Max detected intensity" />
                 <StatCard icon="✅" label="False Positives" value={falsePos.length.toLocaleString()} color="#4ade80" sub="Suppressed by Agent 2" />
                 <StatCard icon="📢" label="Alerts Sent" value={alerts.length.toLocaleString()} color="#c084fc" sub="Tier 1–4 escalations" />
                 <StatCard icon="🏭" label="Coverage Area" value="Gujarat" color="#38bdf8" sub="Industrial + rural belt" />
@@ -243,25 +311,29 @@ export default function Dashboard({ mlStatus, onRunML }) {
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
-                        <NoData msg="Run ML pipeline to classify detections" />
+                        <NoData msg="Run ML pipeline to classify detections" icon="🎯" cta="Run ML Pipeline" onCta={handleRunML} />
                     )}
                 </Card>
 
                 {/* Risk distribution bar */}
                 <Card>
                     <SectionTitle>Risk Level Distribution</SectionTitle>
-                    <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={riskBarData} barSize={36}>
-                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#8aaccc' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#8aaccc' }} axisLine={false} tickLine={false} width={36} />
-                            <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                            <Bar dataKey="count" radius={[6,6,0,0]}>
-                                {riskBarData.map((entry, i) => (
-                                    <Cell key={i} fill={entry.color} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
+                    {hotspots.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={riskBarData} barSize={36}>
+                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#8aaccc' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 10, fill: '#8aaccc' }} axisLine={false} tickLine={false} width={36} />
+                                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                                <Bar dataKey="count" radius={[6,6,0,0]}>
+                                    {riskBarData.map((entry, i) => (
+                                        <Cell key={i} fill={entry.color} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <NoData msg="No risk data — run ML to analyze" icon="📊" />
+                    )}
                 </Card>
             </div>
 
@@ -283,7 +355,7 @@ export default function Dashboard({ mlStatus, onRunML }) {
                             </LineChart>
                         </ResponsiveContainer>
                     ) : (
-                        <NoData msg="Not enough data for trend" />
+                        <NoData msg="Not enough data for trend" icon="📈" cta="View Detections" onCta={() => console.log('View more')} />
                     )}
                 </Card>
 
@@ -321,10 +393,10 @@ export default function Dashboard({ mlStatus, onRunML }) {
                         <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                             <SectionTitle>Last ML Run</SectionTitle>
                             {[
-                                { label: 'Total processed', val: mlStatus.summary.total || 0 },
-                                { label: 'Classified',      val: mlStatus.summary.patched || 0 },
-                                { label: 'False Positives', val: mlStatus.summary.debunked || 0 },
-                                { label: 'Incidents filed', val: mlStatus.summary.incidents || 0 },
+                                { label: 'Total processed', val: safeNumber(mlStatus.summary.total, 0) },
+                                { label: 'Classified',      val: safeNumber(mlStatus.summary.patched, 0) },
+                                { label: 'False Positives', val: safeNumber(mlStatus.summary.debunked, 0) },
+                                { label: 'Incidents filed', val: safeNumber(mlStatus.summary.incidents, 0) },
                             ].map(({ label, val }) => (
                                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</span>
@@ -340,11 +412,13 @@ export default function Dashboard({ mlStatus, onRunML }) {
             <Card>
                 <SectionTitle>Recent Alerts (Last 5)</SectionTitle>
                 {alerts.length === 0 ? (
-                    <NoData msg="No alerts yet — system monitoring" />
+                    <NoData msg="No alerts yet — system monitoring" icon="🟢" />
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 8 }}>
                         {alerts.slice(0, 5).map(a => {
-                            const tc = ['#22c55e','#f59e0b','#ef4444','#7c3aed'][a.tier - 1] || '#888';
+                            const tier = parseInt(a.tier) || 1;
+                            const tc = ['#22c55e','#f59e0b','#ef4444','#7c3aed'][tier - 1] || '#888';
+                            const sentAt = safeDateString(a.sent_at) ? new Date(a.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
                             return (
                                 <div key={a.id} style={{
                                     padding: '10px 12px', borderRadius: 9,
@@ -352,13 +426,13 @@ export default function Dashboard({ mlStatus, onRunML }) {
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                         <span style={{ fontSize: 10, fontWeight: 700, color: tc,
-                                            textTransform: 'uppercase' }}>Tier {a.tier}</span>
+                                            textTransform: 'uppercase' }}>Tier {tier}</span>
                                         <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                            {new Date(a.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {sentAt}
                                         </span>
                                     </div>
                                     <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-                                        {a.message}
+                                        {a.message || 'Alert triggered'}
                                     </p>
                                 </div>
                             );
@@ -368,15 +442,6 @@ export default function Dashboard({ mlStatus, onRunML }) {
             </Card>
 
             <div style={{ height: 32 }} />
-        </div>
-    );
-}
-
-function NoData({ msg }) {
-    return (
-        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>📊</div>
-            <div style={{ fontSize: 12 }}>{msg}</div>
         </div>
     );
 }
