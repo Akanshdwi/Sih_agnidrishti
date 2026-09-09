@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON } from 'react-leaflet';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { getHotspots, getFacilities } from './api.js';
+import { evaluateIncident, getHotspots, getFacilities } from './api.js';
 import FacilityPanel from './FacilityPanel.jsx';
 import TimeSlider from './TimeSlider.jsx';
 import Legend from './Legend.jsx';
@@ -25,9 +25,26 @@ const RISK_COLOR = (score) => {
     return '#22c55e';
 };
 
-function HotspotPopup({ h }) {
+// ── Safe number parsing ──
+const safeNumber = (val, defaultVal = 0) => {
+    const n = parseFloat(val);
+    return isNaN(n) ? defaultVal : n;
+};
+
+// ── Safe date parsing ──
+const safeDate = (dateStr) => {
+    if (!dateStr) return new Date();
+    try {
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? new Date() : d;
+    } catch {
+        return new Date();
+    }
+};
+
+function HotspotPopup({ h, evaluation, onEvaluate }) {
     const cls = h.classification || 'Unclassified';
-    const risk = h.risk_score;
+    const risk = safeNumber(h.risk_score, null);
     const clsColor = COLORS[cls] || '#9ca3af';
     
     const loc = getRegionInfo(h.lat, h.lon);
@@ -60,7 +77,7 @@ function HotspotPopup({ h }) {
                     <span style={{ fontWeight: 500 }}>{landCover}</span>
 
                     <span style={{ color: '#64748b' }}>FRP</span>
-                    <span style={{ fontWeight: 700, color: '#ef4444' }}>{h.frp?.toFixed(1) ?? '—'} MW</span>
+                    <span style={{ fontWeight: 700, color: '#ef4444' }}>{safeNumber(h.frp, 0).toFixed(1)} MW</span>
                     
                     <span style={{ color: '#64748b' }}>Risk Score</span>
                     <span style={{ fontWeight: 700, color: risk ? RISK_COLOR(risk) : '#64748b' }}>
@@ -70,7 +87,7 @@ function HotspotPopup({ h }) {
                     {h.class_confidence != null && (
                         <>
                             <span style={{ color: '#64748b' }}>ML Conf.</span>
-                            <span style={{ fontWeight: 600 }}>{(h.class_confidence * 100).toFixed(0)}%</span>
+                            <span style={{ fontWeight: 600 }}>{(safeNumber(h.class_confidence, 0) * 100).toFixed(0)}%</span>
                         </>
                     )}
                     
@@ -78,7 +95,7 @@ function HotspotPopup({ h }) {
                     <span style={{ fontWeight: 500 }}>{satName}</span>
                     
                     <span style={{ color: '#64748b' }}>Detected</span>
-                    <span style={{ fontWeight: 500 }}>{h.acq_date ? new Date(h.acq_date).toLocaleString() : '—'}</span>
+                    <span style={{ fontWeight: 500 }}>{safeDate(h.acq_date).toLocaleString()}</span>
                 </div>
 
                 {h.explanation && (
@@ -89,6 +106,28 @@ function HotspotPopup({ h }) {
                         {h.explanation}
                     </div>
                 )}
+
+                <button onClick={() => onEvaluate(h)} style={{
+                    margin: '0 8px 8px', padding: '6px 8px', border: 'none',
+                    borderRadius: 6, background: '#0f766e', color: 'white',
+                    cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                }}>
+                    Evaluate incident
+                </button>
+                {evaluation && !evaluation.error && (
+                    <div style={{ margin: '0 8px 8px', borderTop: '1px solid #e2e8f0', paddingTop: 6 }}>
+                        <b>{evaluation.status}</b> · {evaluation.risk_score}/100
+                        <div style={{ color: '#475569', fontSize: 11, marginTop: 3 }}>
+                            {Array.isArray(evaluation.reasons) ? evaluation.reasons.join('; ') : 'Evaluation complete'}
+                        </div>
+                        {evaluation.ml_prediction && (
+                            <div style={{ color: '#0f766e', fontSize: 11, marginTop: 5 }}>
+                                ML: {evaluation.ml_prediction.threat_short_name} · {Math.round(safeNumber(evaluation.ml_prediction.confidence, 0) * 100)}% confidence · {evaluation.ml_prediction.severity_tier}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {evaluation?.error && <div style={{ color: '#b91c1c', margin: '0 8px 8px', fontSize: 11 }}>⚠️ {evaluation.error}</div>}
             </div>
         </div>
     );
@@ -103,18 +142,58 @@ export default function MapView({ onHotspotCount }) {
     const [loading, setLoading]                 = useState(true);
     const [show3D, setShow3D]                   = useState(false);
     const [leftPanelOpen, setLeftPanelOpen]     = useState(true);
+    const [evaluations, setEvaluations]         = useState({});
+    const [mapError, setMapError]               = useState(null);
+
+    const handleEvaluate = async (hotspot) => {
+        try {
+            const evaluation = await evaluateIncident({
+                event_id: hotspot.id,
+                frp: safeNumber(hotspot.frp, 0),
+                confidence: safeNumber(hotspot.confidence, 0),
+                is_night: hotspot.is_night || false,
+                nearest_industrial_distance_m: safeNumber(hotspot.nearest_industrial_distance_m, 0),
+                industrial_count: safeNumber(hotspot.industrial_count, 0),
+                nearest_settlement_distance_m: safeNumber(hotspot.nearest_settlement_distance_m, 0),
+                settlement_count: safeNumber(hotspot.settlement_count, 0),
+                building_count: safeNumber(hotspot.building_count, 0),
+                is_vegetation: hotspot.is_vegetation || false,
+                is_cropland: hotspot.is_cropland || false,
+            });
+            setEvaluations(current => ({ ...current, [hotspot.id]: evaluation }));
+        } catch (error) {
+            const errorMsg = error.message || 'Evaluation failed. Please try again.';
+            setEvaluations(current => ({ ...current, [hotspot.id]: { error: errorMsg } }));
+        }
+    };
 
     const loadData = useCallback(() => {
+        setMapError(null);
         Promise.all([getHotspots(), getFacilities()])
             .then(([h, f]) => {
-                setHotspots(h);
-                setTimeFiltered(h);
-                setClassFiltered(h);
-                setFacilities(f);
+                // Defensive: ensure arrays
+                const hotspotArray = Array.isArray(h) ? h : [];
+                const facilityArray = Array.isArray(f) ? f : [];
+                
+                setHotspots(hotspotArray);
+                setTimeFiltered(hotspotArray);
+                setClassFiltered(hotspotArray);
+                setFacilities(facilityArray);
                 setLoading(false);
-                if (onHotspotCount) onHotspotCount(h.length);
+                
+                // Report count — safe against undefined/null
+                if (onHotspotCount) onHotspotCount(hotspotArray.length);
             })
-            .catch(() => setLoading(false));
+            .catch((err) => {
+                console.error('[MapView] Error loading data:', err);
+                setMapError('Failed to load map data. Please refresh.');
+                setHotspots([]);
+                setTimeFiltered([]);
+                setClassFiltered([]);
+                setFacilities([]);
+                setLoading(false);
+                if (onHotspotCount) onHotspotCount(0);
+            });
     }, [onHotspotCount]);
 
     useEffect(() => {
@@ -125,12 +204,12 @@ export default function MapView({ onHotspotCount }) {
     }, [loadData]);
 
     const handleTimeFiltered = useCallback((filtered) => {
-        setTimeFiltered(filtered);
-        setClassFiltered(filtered); 
+        setTimeFiltered(Array.isArray(filtered) ? filtered : []);
+        setClassFiltered(Array.isArray(filtered) ? filtered : []); 
     }, []);
 
     const handleClassFiltered = useCallback((filtered) => {
-        setClassFiltered(filtered);
+        setClassFiltered(Array.isArray(filtered) ? filtered : []);
     }, []);
 
     const visibleHotspots = classFiltered;
@@ -146,6 +225,16 @@ export default function MapView({ onHotspotCount }) {
                     <div style={{ fontSize: 36, animation: 'pulse-ring 2s infinite', borderRadius: '50%' }}>🔥</div>
                     <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: 0.5 }}>Loading Thermal Intelligence…</div>
                     <div className="shimmer" style={{ width: 240, height: 4, borderRadius: 2 }} />
+                </div>
+            )}
+
+            {mapError && (
+                <div style={{
+                    position: 'absolute', top: 16, left: 16, zIndex: 1500,
+                    background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+                    padding: '12px 16px', borderRadius: 8, color: '#f87171', fontSize: 12,
+                }}>
+                    ⚠️ {mapError}
                 </div>
             )}
 
@@ -167,19 +256,27 @@ export default function MapView({ onHotspotCount }) {
                     pane="shadowPane"
                 />
 
-                {facilities.map(f => (
-                    <GeoJSON
-                        key={f.id}
-                        data={JSON.parse(f.geometry)}
-                        style={{ color: '#64748b', weight: 1.5, fillOpacity: 0.15, fillColor: '#94a3b8' }}
-                        eventHandlers={{ click: () => setSelectedFacility(f.id) }}
-                    />
-                ))}
+                {facilities.map(f => {
+                    try {
+                        const geom = typeof f.geometry === 'string' ? JSON.parse(f.geometry) : f.geometry;
+                        return (
+                            <GeoJSON
+                                key={f.id}
+                                data={geom}
+                                style={{ color: '#64748b', weight: 1.5, fillOpacity: 0.15, fillColor: '#94a3b8' }}
+                                eventHandlers={{ click: () => setSelectedFacility(f.id) }}
+                            />
+                        );
+                    } catch (e) {
+                        console.warn(`[MapView] Failed to parse facility ${f.id} geometry:`, e);
+                        return null;
+                    }
+                })}
 
                 {visibleHotspots.map(h => {
                     const cls   = h.classification || 'False Positive';
                     const color = COLORS[cls] || '#9ca3af';
-                    const risk  = h.risk_score || 0;
+                    const risk  = safeNumber(h.risk_score, 0);
                     
                     let r = 5;
                     let opacity = 0.6;
@@ -198,7 +295,7 @@ export default function MapView({ onHotspotCount }) {
                     return (
                         <CircleMarker
                             key={h.id}
-                            center={[h.lat, h.lon]}
+                            center={[safeNumber(h.lat, 0), safeNumber(h.lon, 0)]}
                             radius={r}
                             pathOptions={{
                                 color,
@@ -207,7 +304,7 @@ export default function MapView({ onHotspotCount }) {
                                 weight: weight,
                             }}
                         >
-                            <Popup maxWidth={260}><HotspotPopup h={h} /></Popup>
+                            <Popup maxWidth={260}><HotspotPopup h={h} evaluation={evaluations[h.id]} onEvaluate={handleEvaluate} /></Popup>
                         </CircleMarker>
                     );
                 })}
