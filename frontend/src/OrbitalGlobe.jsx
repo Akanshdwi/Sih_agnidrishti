@@ -1161,37 +1161,39 @@ export default function OrbitalGlobe({
     animate();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", handleResize);
-      dom.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerUp);
-      dom.removeEventListener("wheel", onWheel);
-      dom.removeEventListener("pointermove", onHoverPointerMove);
-      dom.removeEventListener("pointerleave", onHoverPointerLeave);
+      try {
+        cancelAnimationFrame(animationFrameId);
+        window.removeEventListener("resize", handleResize);
+        dom.removeEventListener("pointerdown", onPointerDown);
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("pointercancel", onPointerUp);
+        dom.removeEventListener("wheel", onWheel);
+        dom.removeEventListener("pointermove", onHoverPointerMove);
+        dom.removeEventListener("pointerleave", onHoverPointerLeave);
 
-      radiationSprites.forEach((fx) => {
-        fx.sprite.material.map?.dispose();
-        fx.sprite.material.dispose();
-      });
-      radiationArcs.forEach((fx) => {
-        fx.arcGeometry.dispose();
-        fx.arc.material.dispose();
-      });
-      geometry.dispose();
-      pointsMaterial.dispose();
-      coreGeometry.dispose();
-      coreMaterial.dispose();
-      hoverProxyGeometry.dispose();
-      hoverProxyMaterial.dispose();
-      starGeom.dispose();
-      starMat.dispose();
-      if (particleTexture) particleTexture.dispose();
-      composer.dispose();
-      renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+        radiationSprites.forEach((fx) => {
+          fx.sprite.material.map?.dispose();
+          fx.sprite.material.dispose();
+        });
+        radiationArcs.forEach((fx) => {
+          fx.arcGeometry.dispose();
+          fx.arc.material.dispose();
+        });
+        geometry.dispose();
+        pointsMaterial.dispose();
+        coreGeometry.dispose();
+        coreMaterial.dispose();
+        hoverProxyGeometry.dispose();
+        hoverProxyMaterial.dispose();
+        if (particleTexture) particleTexture.dispose();
+        composer.dispose();
+        renderer.dispose();
+        if (container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+      } catch (err) {
+        console.warn("OrbitalGlobe cleanup error (non-fatal):", err);
       }
     };
   }, []);

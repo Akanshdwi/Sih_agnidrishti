@@ -422,6 +422,7 @@ export default function LandingHome({ onSignOut, onAccess, onLogin, workspaceMod
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const searchInputRef = useRef(null);
   const searchDropdownRef = useRef(null);
+  const isTyping = searchFocused || searchQuery.trim().length > 0;
 
   const selectedRegion = useMemo(() => {
     if (!selectedRegionId) return null;
@@ -517,7 +518,7 @@ export default function LandingHome({ onSignOut, onAccess, onLogin, workspaceMod
         className={landingEntrance ? "globe-entry-active" : ""}
       />
 
-      <section className={`landing-hero-copy ${landingEntrance ? "hero-entry" : ""}`} aria-label="Orbital thermal intelligence">
+            <section className={`landing-hero-copy ${landingEntrance ? "hero-entry" : ""} ${isTyping ? "is-typing" : ""}`} aria-label="Orbital thermal intelligence">
         <h1>Explore the planet&apos;s thermal signals</h1>
         <p>Real-time wildfire and industrial heat intelligence from orbit.</p>
       </section>
@@ -633,7 +634,7 @@ export default function LandingHome({ onSignOut, onAccess, onLogin, workspaceMod
       </header>
 
       {/* ── Center-Top Glassmorphic Search Bar ── */}
-      <div className={`search-bar-container ${landingEntrance ? "staged-entrance search-stage" : ""}`}>
+            <div className={`search-bar-container ${landingEntrance ? "staged-entrance search-stage" : ""} ${isTyping ? "is-typing" : ""}`}>
         <div className={`search-pill ${searchFocused ? "is-focused" : ""}`}>
           <svg className="search-icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -706,7 +707,7 @@ export default function LandingHome({ onSignOut, onAccess, onLogin, workspaceMod
       </div>
 
       {workspaceMode && (
-        <div className={`globe-filter-row ${landingEntrance ? "staged-entrance filter-stage" : ""}`} aria-label="Live map filters">
+                <div className={`globe-filter-row ${landingEntrance ? "staged-entrance filter-stage" : ""} ${isTyping ? "is-typing" : ""}`} aria-label="Live map filters">
           <label>Country<select defaultValue="all"><option value="all">All countries</option><option>India</option><option>United States</option><option>Australia</option></select></label>
           <label>Region<select defaultValue="all"><option value="all">All regions</option><option>Gujarat</option><option>Simlipal</option><option>Bandipur</option></select></label>
           <label>Continent<select defaultValue="all"><option value="all">All continents</option><option>Asia</option><option>Europe</option><option>Africa</option><option>Americas</option></select></label>
