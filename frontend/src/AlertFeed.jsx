@@ -11,14 +11,14 @@ function AlertItem({ a }) {
 
     const fetchReport = async () => {
         if (report) {
-            setReport(null); // toggle off
+            setReport(null);
             return;
         }
         setLoadingReport(true);
         try {
             const data = await getIncidentReport(a.incident_id);
             setReport(data.report || 'No report available.');
-        } catch (err) {
+        } catch {
             setReport('Error generating report.');
         } finally {
             setLoadingReport(false);
@@ -28,38 +28,40 @@ function AlertItem({ a }) {
     const color = TIER_COLOR[a.tier] || '#888';
     const bg    = TIER_BG[a.tier]    || 'transparent';
     const isCritical = a.tier >= 3;
+
     return (
         <div style={{
-            padding: '9px 11px',
-            borderRadius: 9,
+            padding: '7px 10px',
+            borderRadius: 8,
             background: bg,
             borderLeft: `3px solid ${color}`,
-            marginBottom: 6,
+            marginBottom: 5,
             transition: 'opacity 0.2s',
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                 <span
                     className={`badge ${isCritical ? 'badge-critical' : a.tier === 2 ? 'badge-high' : 'badge-low'} ${isCritical ? 'pulse' : ''}`}
+                    style={{ fontSize: 9, padding: '1px 6px' }}
                 >
                     T{a.tier} · {TIER_LABEL[a.tier]}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--ag-text-muted)' }}>
+                <span style={{ fontSize: 9, color: 'var(--ag-text-muted)' }}>
                     {new Date(a.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--ag-text-secondary)', lineHeight: 1.4, margin: 0 }}>
+            <p style={{ fontSize: 10, color: 'var(--ag-text-secondary)', lineHeight: 1.3, margin: 0 }}>
                 {a.message}
             </p>
-            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                     onClick={fetchReport}
                     disabled={loadingReport}
                     style={{
                         background: 'rgba(56, 189, 248, 0.08)',
-                        border: '1px solid rgba(56, 189, 248, 0.25)',
-                        borderRadius: 6,
-                        padding: '4px 8px',
-                        fontSize: 10,
+                        border: '1px solid rgba(56, 189, 248, 0.2)',
+                        borderRadius: 4,
+                        padding: '2px 8px',
+                        fontSize: 9,
                         color: 'var(--ag-cyan)',
                         cursor: loadingReport ? 'wait' : 'pointer',
                         fontFamily: 'inherit',
@@ -70,13 +72,13 @@ function AlertItem({ a }) {
             </div>
             {report && (
                 <div style={{
-                    marginTop: 8,
-                    padding: '8px',
+                    marginTop: 6,
+                    padding: '6px 8px',
                     background: 'rgba(0, 0, 0, 0.25)',
-                    borderRadius: 6,
-                    fontSize: 11,
+                    borderRadius: 4,
+                    fontSize: 10,
                     color: 'var(--ag-text-secondary)',
-                    lineHeight: 1.4,
+                    lineHeight: 1.3,
                     fontStyle: 'italic',
                     borderLeft: '2px solid var(--ag-cyan)',
                 }}>
@@ -87,16 +89,10 @@ function AlertItem({ a }) {
     );
 }
 
-/**
- * AlertFeed — floating live alert panel shown over the globe / map view.
- * Polls the real /api/alerts endpoint every 15s; nothing here is static.
- * Collapsible so it doesn't permanently block the globe if not needed.
- */
 export default function AlertFeed({ collapsible = true }) {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [errored, setErrored] = useState(false);
-    const [collapsed, setCollapsed] = useState(false);
 
     useEffect(() => {
         const load = () =>
@@ -111,72 +107,60 @@ export default function AlertFeed({ collapsible = true }) {
     const criticalCount = alerts.filter(a => a.tier >= 3).length;
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-            {/* Header */}
-            <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                paddingBottom: collapsed ? 0 : 10, borderBottom: collapsed ? 'none' : '1px solid var(--ag-glass-border)',
-                marginBottom: collapsed ? 0 : 4,
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Only show header if not collapsible (dropdown mode) */}
+            {!collapsible && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingBottom: 6,
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    marginBottom: 6,
+                }}>
                     <span style={{
-                        fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                        letterSpacing: 1, color: 'var(--ag-cyan)',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 1,
+                        color: 'var(--ag-cyan)',
                     }}>
-                        🛰 Live Alert Feed
+                        🛰 Live Alerts
                     </span>
                     {criticalCount > 0 && (
-                        <span className="badge badge-critical pulse" style={{ fontSize: 9 }}>{criticalCount} critical</span>
+                        <span className="badge badge-critical pulse" style={{ fontSize: 8, padding: '1px 6px' }}>
+                            {criticalCount} critical
+                        </span>
                     )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: 'var(--ag-text-muted)' }}>
-                        {errored ? 'offline' : `${alerts.length} total · live`}
+                    <span style={{ fontSize: 9, color: 'var(--ag-text-muted)' }}>
+                        {errored ? 'offline' : `${alerts.length} total`}
                     </span>
-                    {collapsible && (
-                        <button
-                            onClick={() => setCollapsed(c => !c)}
-                            aria-label={collapsed ? 'Expand alert feed' : 'Collapse alert feed'}
-                            style={{
-                                background: 'transparent', border: 'none', color: 'var(--ag-text-muted)',
-                                cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 2,
-                            }}
-                        >
-                            {collapsed ? '▲' : '▼'}
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* List */}
-            {!collapsed && (
-                <div style={{ flex: 1, overflowY: 'auto', padding: '8px 2px' }}>
-                    {loading && (
-                        <>
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="shimmer" style={{ height: 56, marginBottom: 6, borderRadius: 9 }} />
-                            ))}
-                        </>
-                    )}
-
-                    {!loading && errored && (
-                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ag-text-muted)', fontSize: 12 }}>
-                            <div style={{ fontSize: 24, marginBottom: 6 }}>⚠️</div>
-                            <div>Couldn't reach the alert service</div>
-                        </div>
-                    )}
-
-                    {!loading && !errored && alerts.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ag-text-muted)', fontSize: 12 }}>
-                            <div style={{ fontSize: 24, marginBottom: 6 }}>🟢</div>
-                            <div>No alerts — system monitoring</div>
-                            <div style={{ fontSize: 10, marginTop: 4 }}>Alerts appear after HIGH/CRITICAL events</div>
-                        </div>
-                    )}
-
-                    {!loading && !errored && alerts.map(a => <AlertItem key={a.id} a={a} />)}
                 </div>
             )}
+
+            <div style={{ maxHeight: collapsible ? 'none' : '300px', overflowY: 'auto' }}>
+                {loading && (
+                    <>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="shimmer" style={{ height: 40, marginBottom: 4, borderRadius: 6 }} />
+                        ))}
+                    </>
+                )}
+
+                {!loading && errored && (
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--ag-text-muted)', fontSize: 11 }}>
+                        ⚠️ Couldn't reach alert service
+                    </div>
+                )}
+
+                {!loading && !errored && alerts.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--ag-text-muted)', fontSize: 11 }}>
+                        🟢 No alerts — system monitoring
+                    </div>
+                )}
+
+                {!loading && !errored && alerts.map(a => <AlertItem key={a.id} a={a} />)}
+            </div>
         </div>
     );
 }

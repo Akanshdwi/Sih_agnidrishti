@@ -6,7 +6,8 @@ import EnteringPage from './EnteringPage.jsx';
 import Dashboard from './Dashboard.jsx';
 import LoginPage from './LoginPage.jsx';
 import ProfileBadge from './ProfileBadge.jsx';
-import LandingHome from './LandingHome.tsx';
+import LandingHome from './LandingHome.jsx';
+import MapView from './MapView.jsx';
 
 /* ─── Tab config ─────────────────────────────────────────────────────────── */
 const TABS = [
@@ -86,7 +87,7 @@ function IncidentsTab() {
                 .then(d => { setIncidents(Array.isArray(d) ? d : []); setLoading(false); setErrored(false); })
                 .catch(() => { setLoading(false); setErrored(true); });
         load();
-        const t = setInterval(load, 20000); // live-poll, same as the dashboard and alert feed
+        const t = setInterval(load, 20000);
         return () => clearInterval(t);
     }, []);
 
@@ -95,7 +96,6 @@ function IncidentsTab() {
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--ag-bg-void)' }}>
-            {/* Header + filter pills */}
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--ag-glass-border)' }}>
                 <div style={{
                     fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase',
@@ -146,12 +146,11 @@ function IncidentsTab() {
     );
 }
 
-
 /* ─── Main App ────────────────────────────────────────────────────────────── */
 export default function App() {
     const [user, setUser] = useState(() => getUser());
     const authed = !!(user && getToken());
-    const [viewMode, setViewMode] = useState(() => authed ? 'landing' : 'entering'); // 'entering' | 'landing' | 'login' | 'dashboard'
+    const [viewMode, setViewMode] = useState(() => authed ? 'landing' : 'entering');
     const [mlStatus, setMlStatus] = useState(null);
     const [hotspotCount, setHotspotCount] = useState(null);
     const [activeTab, setActiveTab] = useState('map');
@@ -193,7 +192,7 @@ export default function App() {
         clearToken();
         clearUser();
         setUser(null);
-        setViewMode('landing');
+        setViewMode('entering');  // Redirect to entrance video
     };
 
     const handleLaunchDashboard = () => {
@@ -208,31 +207,25 @@ export default function App() {
         return <EnteringPage onEnter={() => setViewMode('login')} />;
     }
 
-    // Render 3D Google Research style Landing Home
+    // Render 3D Google Research style Landing Home (main globe view)
     if (viewMode === 'landing') {
         return (
-            <>
-                <LandingHome
-                    workspaceMode
-                    landingEntrance={landingEntrance}
-                    onWorkspaceNavigate={(tab) => {
-                        if (tab === 'map') return;
-                        if (!authed) {
-                            setViewMode('login');
-                            return;
-                        }
-                        setActiveTab(tab === 'incidents' ? 'incidents' : 'dashboard');
-                        setViewMode('dashboard');
-                    }}
-                    onLogin={() => setViewMode('login')}
-                    onSignOut={authed ? handleLogout : undefined}
-                />
-                {authed && (
-                    <aside className="globe-alert-feed" aria-label="Live alert feed">
-                        <AlertFeed />
-                    </aside>
-                )}
-            </>
+            <LandingHome
+                workspaceMode
+                landingEntrance={landingEntrance}
+                onWorkspaceNavigate={(tab) => {
+                    if (tab === 'map') return;
+                    if (!authed) {
+                        setViewMode('login');
+                        return;
+                    }
+                    setActiveTab(tab === 'incidents' ? 'incidents' : 'dashboard');
+                    setViewMode('dashboard');
+                }}
+                onLogin={() => setViewMode('login')}
+                onSignOut={authed ? handleLogout : undefined}
+                onAccess={handleLaunchDashboard}
+            />
         );
     }
 
@@ -247,7 +240,7 @@ export default function App() {
         );
     }
 
-    // Render Full Mission Control (Live Map, Dashboard, Incidents)
+    // Render Full Mission Control (Dashboard / Incidents / Map)
     return (
         <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
 
@@ -258,7 +251,6 @@ export default function App() {
                     <h1>AgniDrishti</h1>
                 </div>
 
-                {/* Return to 3D Earth Globe */}
                 <button
                     onClick={() => setViewMode('landing')}
                     style={{
@@ -312,16 +304,12 @@ export default function App() {
 
             {/* ── Map Tab ── */}
             {activeTab === 'map' && (
-                <>
-                    <LandingHome
-                        workspaceMode
-                        onWorkspaceNavigate={setActiveTab}
-                        onSignOut={handleLogout}
-                    />
-                    <aside className="globe-alert-feed" aria-label="Live alert feed">
-                        <AlertFeed />
-                    </aside>
-                </>
+                <div style={{
+                    position: 'absolute', top: 'var(--topbar-h)', left: 0, right: 0,
+                    bottom: 0,
+                }}>
+                    <MapView onHotspotCount={setHotspotCount} />
+                </div>
             )}
 
             {/* ── Dashboard Tab ── */}
