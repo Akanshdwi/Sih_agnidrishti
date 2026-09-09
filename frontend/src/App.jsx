@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getIncidents, getMlStatus, getToken, getUser, clearToken, clearUser } from './api.js';
+import { getIncidents, getMlStatus, getHotspots, getToken, getUser, clearToken, clearUser } from './api.js';
 import AlertFeed from './AlertFeed.jsx';
 import MLPanel from './MLPanel.jsx';
 import EnteringPage from './EnteringPage.jsx';
@@ -44,9 +44,10 @@ function IncidentRow({ inc }) {
     const s = inc.status || 'FLAGGED';
     return (
         <div style={{
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+            background: 'var(--ag-glass-bg)', border: '1px solid var(--ag-glass-border)',
             borderRadius: 10, padding: '12px 14px', marginBottom: 8,
             borderLeft: `3px solid ${PRIORITY_COLOR[p] || '#555'}`,
+            backdropFilter: 'blur(12px)',
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -61,11 +62,11 @@ function IncidentRow({ inc }) {
                         border: `1px solid ${STATUS_COLOR[s]}35`, textTransform: 'uppercase',
                     }}>{s}</span>
                 </div>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                    {inc.created_at ? new Date(inc.created_at).toLocaleString() : '—'}
+                <span style={{ fontSize: 10, color: 'var(--ag-text-muted)' }}>
+                    {new Date(inc.created_at).toLocaleString()}
                 </span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, color: 'var(--ag-text-secondary)', lineHeight: 1.5 }}>
                 Incident #{inc.id}
                 {inc.agent3?.reason && ` — ${inc.agent3.reason}`}
             </div>
@@ -76,65 +77,77 @@ function IncidentRow({ inc }) {
 function IncidentsTab() {
     const [incidents, setIncidents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [errored, setErrored] = useState(false);
     const [filter, setFilter] = useState('ALL');
 
     useEffect(() => {
-        getIncidents()
-            .then(d => { setIncidents(Array.isArray(d) ? d : []); setLoading(false); })
-            .catch(() => setLoading(false));
+        const load = () =>
+            getIncidents()
+                .then(d => { setIncidents(Array.isArray(d) ? d : []); setLoading(false); setErrored(false); })
+                .catch(() => { setLoading(false); setErrored(true); });
+        load();
+        const t = setInterval(load, 20000); // live-poll, same as the dashboard and alert feed
+        return () => clearInterval(t);
     }, []);
 
     const priorities = ['ALL', 'CRITICAL', 'HIGH', 'MODERATE', 'LOW'];
-    const visible = filter === 'ALL' ? incidents : incidents.filter(i => (i.threat_priority || 'LOW') === filter);
+    const visible = filter === 'ALL' ? incidents : incidents.filter(i => i.threat_priority === filter);
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Filter pills */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
-                {priorities.map(p => (
-                    <button key={p} onClick={() => setFilter(p)} style={{
-                        padding: '4px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                        cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
-                        letterSpacing: 0.5, transition: 'all 0.15s',
-                        background: filter === p ? (PRIORITY_COLOR[p] ? `${PRIORITY_COLOR[p]}20` : 'rgba(59,130,246,0.2)') : 'rgba(255,255,255,0.04)',
-                        border: filter === p
-                            ? `1px solid ${PRIORITY_COLOR[p] || '#3b82f6'}60`
-                            : '1px solid var(--border)',
-                        color: filter === p ? (PRIORITY_COLOR[p] || '#60a5fa') : 'var(--text-secondary)',
-                        outline: 'none',
-                    }}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            setFilter(p);
-                        }
-                    }}
-                    >{p}</button>
-                ))}
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
-                    {visible.length} incidents
-                </span>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--ag-bg-void)' }}>
+            {/* Header + filter pills */}
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--ag-glass-border)' }}>
+                <div style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase',
+                    color: 'var(--ag-cyan)', marginBottom: 10,
+                }}>
+                    ISRO · DRDO · Multi-Agent Verdicts
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {priorities.map(p => (
+                        <button key={p} onClick={() => setFilter(p)} style={{
+                            padding: '4px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                            cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
+                            letterSpacing: 0.5, transition: 'all 0.15s',
+                            background: filter === p ? `${PRIORITY_COLOR[p] || '#38bdf8'}20` : 'rgba(255,255,255,0.04)',
+                            border: filter === p
+                                ? `1px solid ${PRIORITY_COLOR[p] || '#38bdf8'}60`
+                                : '1px solid var(--ag-glass-border)',
+                            color: filter === p ? (PRIORITY_COLOR[p] || 'var(--ag-cyan)') : 'var(--ag-text-secondary)',
+                        }}>{p}</button>
+                    ))}
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ag-text-muted)', alignSelf: 'center' }}>
+                        {errored ? 'offline' : `${visible.length} incidents`}
+                    </span>
+                </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
                 {loading && [1,2,3].map(i => (
                     <div key={i} className="shimmer" style={{ height: 72, borderRadius: 10, marginBottom: 8 }} />
                 ))}
-                {!loading && visible.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                {!loading && errored && (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ag-text-muted)' }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+                        <div style={{ fontSize: 13 }}>Couldn't reach the incidents service</div>
+                        <div style={{ fontSize: 11, marginTop: 4 }}>Check the API server / network connection</div>
+                    </div>
+                )}
+                {!loading && !errored && visible.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ag-text-muted)' }}>
                         <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
                         <div style={{ fontSize: 13 }}>No incidents yet</div>
                         <div style={{ fontSize: 11, marginTop: 4 }}>Run the ML pipeline to generate incident reports</div>
                     </div>
                 )}
-                {visible.map(inc => <IncidentRow key={inc.id} inc={inc} />)}
+                {!loading && !errored && visible.map(inc => <IncidentRow key={inc.id} inc={inc} />)}
             </div>
         </div>
     );
 }
 
 
-/* ─── Main App ─────────────────────────────────────────────────────────── */
+/* ─── Main App ────────────────────────────────────────────────────────────── */
 export default function App() {
     const [user, setUser] = useState(() => getUser());
     const authed = !!(user && getToken());
@@ -144,22 +157,22 @@ export default function App() {
     const [activeTab, setActiveTab] = useState('map');
     const [landingEntrance, setLandingEntrance] = useState(false);
 
-    // Handle auth-expired event from API
-    useEffect(() => {
-        const handleAuthExpired = () => {
-            setUser(null);
-            setViewMode('login');
-            console.warn('[App] Auth expired, redirecting to login');
-        };
-        window.addEventListener('auth-expired', handleAuthExpired);
-        return () => window.removeEventListener('auth-expired', handleAuthExpired);
-    }, []);
-
     useEffect(() => {
         if (!authed) return;
         const load = () => getMlStatus().then(setMlStatus).catch(() => {});
         load();
         const t = setInterval(load, 10000);
+        return () => clearInterval(t);
+    }, [authed]);
+
+    useEffect(() => {
+        if (!authed) return;
+        const load = () =>
+            getHotspots()
+                .then(d => setHotspotCount(Array.isArray(d) ? d.length : null))
+                .catch(() => {});
+        load();
+        const t = setInterval(load, 30000);
         return () => clearInterval(t);
     }, [authed]);
 
@@ -293,7 +306,7 @@ export default function App() {
 
                 <div className="topbar-right">
                     <TopbarBadge status={mlStatus} />
-                    <ProfileBadge user={user || undefined} onLogout={handleLogout} />
+                    <ProfileBadge user={user} onLogout={handleLogout} />
                 </div>
             </header>
 
