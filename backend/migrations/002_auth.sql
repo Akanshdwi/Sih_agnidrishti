@@ -15,10 +15,13 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Initial admin account (password: Admin@2026  — change immediately)
+-- NOTE: the previous hash here did not actually correspond to 'Admin@2026'
+-- (verified with bcrypt.compareSync), which made the seeded admin account
+-- unable to log in on a fresh install. Regenerated with bcryptjs, cost 12.
 INSERT INTO users (email, password_hash, full_name, designation, department, role, is_approved)
 VALUES (
   'admin@agnidrishti.gov.in',
-  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiWMLGHlUBP5.Ob.gFEtVwXOhTWq',  -- bcrypt of 'Admin@2026'
+  '$2b$12$3phFYhCIiO8wdxVYCrNx/e/gNv5pEitNOhPuLcpqcrRaukEaVaIfG',  -- bcrypt of 'Admin@2026'
   'System Administrator',
   'IT Administrator',
   'ISRO / NIC',

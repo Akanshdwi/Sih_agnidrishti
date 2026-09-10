@@ -9,6 +9,16 @@ services:
     ports: ["5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      # Postgres runs everything in docker-entrypoint-initdb.d in filename order on
+      # first boot, so schema.sql and every migration are mounted here with numeric
+      # prefixes. Previously only schema.sql ran, which meant the `users` table
+      # (added in migrations/002_auth.sql) never got created on a fresh install —
+      # login/register would fail with "relation users does not exist" and the
+      # rest of the app (dashboard, alerts, incidents) looked completely broken
+      # because nothing could authenticate.
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./backend/migrations/001_osm_id_unique.sql:/docker-entrypoint-initdb.d/02_osm_id_unique.sql
+      - ./backend/migrations/002_auth.sql:/docker-entrypoint-initdb.d/03_auth.sql
+      - ./backend/migrations/003_anomaly_cols.sql:/docker-entrypoint-initdb.d/04_anomaly_cols.sql
 volumes:
   pgdata:

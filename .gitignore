@@ -31,3 +31,9 @@ frontend/dist/
 data/raw/osm/*.osm.pbf
 data/raw/**/*.tif
 data/processed/
+
+# ML artifacts
+ml/models/*.joblib
+ml/output/*.parquet
+ml/__pycache__/
+frontend/public/assets/main.mp4

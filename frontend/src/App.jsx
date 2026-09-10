@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { getMlStatus, getToken, getUser, clearToken, clearUser } from './api.js';
-import MapView from './MapView.jsx';
+import { getIncidents, getMlStatus, getHotspots, getToken, getUser, clearToken, clearUser } from './api.js';
 import AlertFeed from './AlertFeed.jsx';
 import MLPanel from './MLPanel.jsx';
 import EnteringPage from './EnteringPage.jsx';
 import Dashboard from './Dashboard.jsx';
 import LoginPage from './LoginPage.jsx';
 import ProfileBadge from './ProfileBadge.jsx';
+import LandingHome from './LandingHome.jsx';
+import MapView from './MapView.jsx';
 
 /* ─── Tab config ─────────────────────────────────────────────────────────── */
 const TABS = [
@@ -44,9 +45,10 @@ function IncidentRow({ inc }) {
     const s = inc.status || 'FLAGGED';
     return (
         <div style={{
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+            background: 'var(--ag-glass-bg)', border: '1px solid var(--ag-glass-border)',
             borderRadius: 10, padding: '12px 14px', marginBottom: 8,
             borderLeft: `3px solid ${PRIORITY_COLOR[p] || '#555'}`,
+            backdropFilter: 'blur(12px)',
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -61,11 +63,11 @@ function IncidentRow({ inc }) {
                         border: `1px solid ${STATUS_COLOR[s]}35`, textTransform: 'uppercase',
                     }}>{s}</span>
                 </div>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: 10, color: 'var(--ag-text-muted)' }}>
                     {new Date(inc.created_at).toLocaleString()}
                 </span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, color: 'var(--ag-text-secondary)', lineHeight: 1.5 }}>
                 Incident #{inc.id}
                 {inc.agent3?.reason && ` — ${inc.agent3.reason}`}
             </div>
@@ -76,64 +78,83 @@ function IncidentRow({ inc }) {
 function IncidentsTab() {
     const [incidents, setIncidents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [errored, setErrored] = useState(false);
     const [filter, setFilter] = useState('ALL');
 
     useEffect(() => {
-        getIncidents()
-            .then(d => { setIncidents(Array.isArray(d) ? d : []); setLoading(false); })
-            .catch(() => setLoading(false));
+        const load = () =>
+            getIncidents()
+                .then(d => { setIncidents(Array.isArray(d) ? d : []); setLoading(false); setErrored(false); })
+                .catch(() => { setLoading(false); setErrored(true); });
+        load();
+        const t = setInterval(load, 20000);
+        return () => clearInterval(t);
     }, []);
 
     const priorities = ['ALL', 'CRITICAL', 'HIGH', 'MODERATE', 'LOW'];
     const visible = filter === 'ALL' ? incidents : incidents.filter(i => i.threat_priority === filter);
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Filter pills */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
-                {priorities.map(p => (
-                    <button key={p} onClick={() => setFilter(p)} style={{
-                        padding: '4px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                        cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
-                        letterSpacing: 0.5, transition: 'all 0.15s',
-                        background: filter === p ? `${PRIORITY_COLOR[p] || 'rgba(59,130,246'}0.2` : 'rgba(255,255,255,0.04)',
-                        border: filter === p
-                            ? `1px solid ${PRIORITY_COLOR[p] || '#3b82f6'}60`
-                            : '1px solid var(--border)',
-                        color: filter === p ? (PRIORITY_COLOR[p] || '#60a5fa') : 'var(--text-secondary)',
-                    }}>{p}</button>
-                ))}
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
-                    {visible.length} incidents
-                </span>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--ag-bg-void)' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--ag-glass-border)' }}>
+                <div style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase',
+                    color: 'var(--ag-cyan)', marginBottom: 10,
+                }}>
+                    ISRO · DRDO · Multi-Agent Verdicts
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {priorities.map(p => (
+                        <button key={p} onClick={() => setFilter(p)} style={{
+                            padding: '4px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                            cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
+                            letterSpacing: 0.5, transition: 'all 0.15s',
+                            background: filter === p ? `${PRIORITY_COLOR[p] || '#38bdf8'}20` : 'rgba(255,255,255,0.04)',
+                            border: filter === p
+                                ? `1px solid ${PRIORITY_COLOR[p] || '#38bdf8'}60`
+                                : '1px solid var(--ag-glass-border)',
+                            color: filter === p ? (PRIORITY_COLOR[p] || 'var(--ag-cyan)') : 'var(--ag-text-secondary)',
+                        }}>{p}</button>
+                    ))}
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ag-text-muted)', alignSelf: 'center' }}>
+                        {errored ? 'offline' : `${visible.length} incidents`}
+                    </span>
+                </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
                 {loading && [1,2,3].map(i => (
                     <div key={i} className="shimmer" style={{ height: 72, borderRadius: 10, marginBottom: 8 }} />
                 ))}
-                {!loading && visible.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                {!loading && errored && (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ag-text-muted)' }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+                        <div style={{ fontSize: 13 }}>Couldn't reach the incidents service</div>
+                        <div style={{ fontSize: 11, marginTop: 4 }}>Check the API server / network connection</div>
+                    </div>
+                )}
+                {!loading && !errored && visible.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ag-text-muted)' }}>
                         <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
                         <div style={{ fontSize: 13 }}>No incidents yet</div>
                         <div style={{ fontSize: 11, marginTop: 4 }}>Run the ML pipeline to generate incident reports</div>
                     </div>
                 )}
-                {visible.map(inc => <IncidentRow key={inc.id} inc={inc} />)}
+                {!loading && !errored && visible.map(inc => <IncidentRow key={inc.id} inc={inc} />)}
             </div>
         </div>
     );
 }
 
-
 /* ─── Main App ────────────────────────────────────────────────────────────── */
 export default function App() {
-    const [inEntrance, setInEntrance] = useState(true);
+    const [user, setUser] = useState(() => getUser());
+    const authed = !!(user && getToken());
+    const [viewMode, setViewMode] = useState(() => authed ? 'landing' : 'entering');
     const [mlStatus, setMlStatus] = useState(null);
     const [hotspotCount, setHotspotCount] = useState(null);
     const [activeTab, setActiveTab] = useState('map');
-    const [user, setUser] = useState(() => getUser());
-    const authed = !!(user && getToken());
+    const [landingEntrance, setLandingEntrance] = useState(false);
 
     useEffect(() => {
         if (!authed) return;
@@ -143,28 +164,107 @@ export default function App() {
         return () => clearInterval(t);
     }, [authed]);
 
-    const handleAuthSuccess = (u) => setUser(u);
-    const handleLogout = () => { clearToken(); clearUser(); setUser(null); };
+    useEffect(() => {
+        if (!authed) return;
+        const load = () =>
+            getHotspots()
+                .then(d => setHotspotCount(Array.isArray(d) ? d.length : null))
+                .catch(() => {});
+        load();
+        const t = setInterval(load, 30000);
+        return () => clearInterval(t);
+    }, [authed]);
 
-    if (inEntrance && !authed) return (
-        <>
-            <LoginPage onAuthSuccess={handleAuthSuccess} />
-            <EnteringPage onEnter={() => setInEntrance(false)} />
-        </>
-    );
-    if (!authed)    return <LoginPage onAuthSuccess={handleAuthSuccess} />;
+    const handleAuthSuccess = (u) => {
+        setUser(u);
+        setLandingEntrance(true);
+        window.setTimeout(() => setLandingEntrance(false), 4700);
+        setViewMode('landing');
+    };
 
+    const handleRegistrationSuccess = () => {
+        setLandingEntrance(true);
+        window.setTimeout(() => setLandingEntrance(false), 4700);
+        setViewMode('landing');
+    };
+
+    const handleLogout = () => {
+        clearToken();
+        clearUser();
+        setUser(null);
+        setViewMode('entering');  // Redirect to entrance video
+    };
+
+    const handleLaunchDashboard = () => {
+        if (authed) {
+            setViewMode('dashboard');
+        } else {
+            setViewMode('login');
+        }
+    };
+
+    if (viewMode === 'entering') {
+        return <EnteringPage onEnter={() => setViewMode('login')} />;
+    }
+
+    // Render 3D Google Research style Landing Home (main globe view)
+    if (viewMode === 'landing') {
+        return (
+            <LandingHome
+                workspaceMode
+                landingEntrance={landingEntrance}
+                onWorkspaceNavigate={(tab) => {
+                    if (tab === 'map') return;
+                    if (!authed) {
+                        setViewMode('login');
+                        return;
+                    }
+                    setActiveTab(tab === 'incidents' ? 'incidents' : 'dashboard');
+                    setViewMode('dashboard');
+                }}
+                onLogin={() => setViewMode('login')}
+                onSignOut={authed ? handleLogout : undefined}
+                onAccess={handleLaunchDashboard}
+            />
+        );
+    }
+
+    // Render Login Page
+    if (viewMode === 'login') {
+        return (
+            <LoginPage
+                onAuthSuccess={handleAuthSuccess}
+                onRegistrationSuccess={handleRegistrationSuccess}
+                onBack={() => setViewMode('landing')}
+            />
+        );
+    }
+
+    // Render Full Mission Control (Dashboard / Incidents / Map)
     return (
         <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
 
             {/* ── Top Bar ── */}
             <header className="topbar">
-                <div className="topbar-brand">
+                <div className="topbar-brand" onClick={() => setViewMode('landing')} style={{ cursor: 'pointer' }} title="Return to Orbital Explorer">
                     <span className="status-dot" />
                     <h1>AgniDrishti</h1>
                 </div>
 
-                {/* ── Tab nav ── */}
+                <button
+                    onClick={() => setViewMode('landing')}
+                    style={{
+                        padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
+                        fontFamily: 'inherit', fontSize: 11, fontWeight: 600,
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 5,
+                        transition: 'all 0.15s ease',
+                    }}
+                    title="Switch to 3D Orbital Explorer"
+                >
+                    🌍 <span>Orbital Explorer</span>
+                </button>
                 <nav style={{ display: 'flex', gap: 4, flex: 1, justifyContent: 'center' }}>
                     {TABS.map(tab => (
                         <button
@@ -204,13 +304,12 @@ export default function App() {
 
             {/* ── Map Tab ── */}
             {activeTab === 'map' && (
-                <>
+                <div style={{
+                    position: 'absolute', top: 'var(--topbar-h)', left: 0, right: 0,
+                    bottom: 0,
+                }}>
                     <MapView onHotspotCount={setHotspotCount} />
-                    <aside className="sidebar">
-                        <AlertFeed />
-                        <MLPanel onStatusChange={setMlStatus} />
-                    </aside>
-                </>
+                </div>
             )}
 
             {/* ── Dashboard Tab ── */}
